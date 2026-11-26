@@ -1,5 +1,13 @@
 # Changes in v25 / 0.25.0
 
+## Native reference serialization fix
+
+- Encode mode-reference effective indices as 1 x 1 complex NumPy arrays for the installed v221 `lumapi` interface. Preserve their real and imaginary components, field arrays, and tracking metadata.
+- Cover reference round trips and the two-wavelength isolated-mode API boundary with synthetic regression tests. This fixes the `Unsupported data type` failure encountered by Block 1 when sending its first wavelength-tracking reference.
+- Geometry, materials, solver resolution, selection criteria, and optimization budgets are unchanged.
+
+## Initial release
+
 - Add Block 0: bounded native MODE domain/mesh calibration, consecutive-step reference checks, PML/joint checks, coordinate screening, local overrides, adaptive probes and expanded-envelope gates.
 - Check complex detuning/coupling, accumulated phase, numerical loss, transverse E-field overlap, pair subspace and TE fraction alongside effective index.
 - Add checksummed numeric checkpoints, resumable solve/time budgets, measured timings and HTML/CSV/JSON reports.

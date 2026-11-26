@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import numpy as np
 from scipy.io import loadmat
@@ -16,8 +16,8 @@ from vlac import cli
 from vlac.cache import SQLiteCache
 from vlac.config import load_config
 from vlac.materials import build_material_bank, material_samples
-from vlac.modes import extract_coupling
-from vlac.native_backend import NativeLumapiBackend, native_script
+from vlac.modes import ModeReference, extract_coupling
+from vlac.native_backend import NativeLumapiBackend, native_script, pack_references, snapshot_from_native
 from vlac.native_mode import prepare_bundle
 from vlac.profiles import evaluate_design_profiles
 
@@ -65,6 +65,56 @@ class NativeBackendTests(unittest.TestCase):
                 self.assertEqual(call.call_count, 1)
                 backend.solve_isolated_mode(geometry(self.config), 1.3e-6, guide="upper", use_cache=False)
                 self.assertEqual(call.call_count, 2)
+
+    def test_native_reference_round_trip_preserves_complex_modes(self):
+        # Synthetic lossy/complex fields exercise every guide and supermode slot.
+        base = fixture_modes()[0]
+        modes = [replace(base, neff=neff, ex=base.ex*(1+2j), ey=base.ex*(3-4j),
+                         identity=f"synthetic-{index}")
+                 for index, neff in enumerate((1.9+2e-7j, 1.8-3e-7j, 1.95+0j, 1.75))]
+        reference = ModeReference(modes[0], modes[1], (modes[2], modes[3]))
+        packed = pack_references((reference, reference))
+        self.assertEqual(packed["n"], 2.)
+        for item in packed["items"]:
+            for name, original in zip(("upper", "lower", "plus", "minus"), modes):
+                with self.subTest(slot=name):
+                    encoded = item[name]
+                    self.assertEqual(encoded["neff"].shape, (1, 1))
+                    self.assertTrue(np.iscomplexobj(encoded["neff"]))
+                    decoded = snapshot_from_native(encoded)
+                    self.assertEqual(decoded.neff, original.neff)
+                    self.assertEqual(decoded.identity, original.identity)
+                    self.assertEqual(decoded.te_fraction, original.te_fraction)
+                    self.assertEqual(decoded.core_fraction, original.core_fraction)
+                    np.testing.assert_array_equal(decoded.ex, original.ex)
+                    np.testing.assert_array_equal(decoded.ey, original.ey)
+        self.assertEqual(pack_references(()), {"n": 0., "items": [0.]})
+
+    def test_wavelength_tracking_crosses_the_real_native_serialization_boundary(self):
+        # Unlike the cache test, exercise _call_native and each session.putv.
+        # This stub enforces v221's rejection of Python complex scalar leaves.
+        def supported(value):
+            if isinstance(value, dict):
+                for child in value.values():
+                    supported(child)
+            elif isinstance(value, list):
+                for child in value:
+                    supported(child)
+            elif isinstance(value, complex):
+                raise TypeError("Unsupported data type: complex scalar")
+
+        backend = self.adapter()
+        backend.progress = None
+        mode = replace(fixture_modes()[0], neff=1.9+2e-7j)
+        backend.session = Mock()
+        backend.session.putv.side_effect = lambda name, value: supported(value)
+        backend.session.getv.return_value = {"ok": 1., "mode": asdict(mode), "overlap": 1.}
+        first, _ = backend.solve_isolated_mode(geometry(self.config), 1.26e-6, guide="lower")
+        tracked, overlap = backend.solve_isolated_mode(geometry(self.config), 1.34e-6,
+                                                       guide="lower", reference=first)
+        self.assertEqual(tracked.neff, mode.neff)
+        self.assertEqual(overlap, 1.)
+        self.assertEqual(backend.session.eval.call_count, 2)
 
     def test_sub_float_display_changes_do_not_collide_in_native_cache(self):
         backend = self.adapter()
