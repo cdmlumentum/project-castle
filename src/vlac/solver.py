@@ -645,7 +645,9 @@ class LumapiBackend:
         ])
         if profile is not None:
             from .block0 import mesh_override_script
-            lines += [f'set("pml layers",{profile.pml_layers}); set("autoscale pml parameters",1);']
+            lines += [f'set("pml layers",{profile.pml_layers});',
+                      'vlac_fde_properties=get;',
+                      'if (findstring(vlac_fde_properties,"autoscale pml parameters")!=-1) { set("autoscale pml parameters",1); }']
             lines += mesh_override_script(profile, geometry, include_upper, include_lower)
         script = "\n".join(lines)
         debug = os.environ.get("VLAC_DUMP_FDE_SCRIPT")

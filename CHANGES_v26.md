@@ -9,6 +9,9 @@
 - Share interpolation and RK4 work between launches; retain separate convergence decisions.
 - Add offline plan/inspect/report operations and process-supplied deterministic sensitivity cases.
 - Reconcile native safe-mode handling and add offline MAT imports. A failed standalone attempt saves an incomplete MAT and empty LMS; prior published Python artifacts remain intact.
+- Fix Block 0 execution on MODE v221 by detecting optional PML autoscaling support; retain actual mesh/PML evidence and the original accuracy guards.
+- Preserve the uniform mesh lattice during reference-domain expansions, including cell parity and roundoff-safe counts, under the explicitly versioned `mode_domain_mesh_calibration_v2_fixed_lattice` method.
+- Expose native solver error details and conservatively account for failed Block 0 calls in the solve budget.
 
 The physical stack/material alternatives, reduced-model basis audit and EME comparisons are excluded. Existing SI units, fixed endpoints, detuning sign, selection/tracking rules and complex coupling convention are preserved. No new model validation or global-optimality claim is made.
 

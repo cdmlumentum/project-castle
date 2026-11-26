@@ -16,7 +16,7 @@ See [v26 changes](CHANGES_v26.md) and [the execution guide](docs/methods/workflo
 
 Block 0 searches transverse padding, mesh spacing and local refinements, validates modes and extracted coefficients against a converged reference, and supplies certified fixed solver settings to Blocks 1–3. It includes solve/time budgets, checked resume and HTML/CSV/JSON reports. Start with [the Block 0 guide](docs/methods/block0-convergence.md) and [v25 changes](CHANGES_v25.md).
 
-`python tools/run_vlac.py block0 --help` lists the command options. A passed full calibration can be supplied as `--block0-dir` to the production blocks or standalone bundle preparation. A trial cannot issue production profiles. The licensed trial for this revision is deferred pending user instruction; offline tests do not establish MODE convergence or a speedup.
+`python tools/run_vlac.py block0 --help` lists the command options. A passed full calibration can be supplied as `--block0-dir` to the production blocks or standalone bundle preparation. A trial cannot issue production profiles. Licensed calibration results remain in the chosen local output directory; offline tests do not establish MODE convergence or a speedup.
 
 ## Zero-mode failure recovery (v23)
 
