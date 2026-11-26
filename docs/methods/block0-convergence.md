@@ -1,5 +1,9 @@
 # Block 0: MODE domain and mesh calibration
 
+For the separately scoped, nine-setting alternative with 180 planned calls and
+a 200-call lifetime cap, see [Reduced Block 0](block0-reduced.md). Select it with
+`block0 --method reduced`; it does not issue this full-envelope certificate.
+
 Block 0 selects the fastest **tested** transverse domain and mesh that meet explicit numerical error limits. It exports two fixed solver profiles and a certificate consumed by Blocks 1–3. It changes computational padding and resolution; physical ridge widths, slabs, gap, BOX constraints and materials remain device inputs.
 
 `src/vlac/block0.py` orchestrates the bounded search, checkpoints and reports. `src/vlac/native/vlac_convergence.lsf` calls the native MODE core for every optical sample. An isolated sample uses two FDE solves; a coupled sample uses three, plus configured zero-mode retries. No synthetic optical model is used in a licensed run.
