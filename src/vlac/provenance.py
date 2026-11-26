@@ -42,7 +42,7 @@ def implementation_identity(family='optical'):
     names = ['geometry.py', 'materials.py', 'modes.py', 'solver.py', 'native_backend.py',
              'native/vlac_core.lsf']
     if family == 'workflow':
-        names += ['profiles.py', 'optimize.py', 'adaptive_endpoint.py', 'characterize.py', 'propagate.py']
+        names += ['profiles.py', 'optimize.py', 'profile_planning.py', 'adaptive_endpoint.py', 'characterize.py', 'propagate.py']
     return digest({name: sha256(files('vlac').joinpath(name).read_bytes().replace(b'\r\n', b'\n')).hexdigest()
                    for name in names})
 

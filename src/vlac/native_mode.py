@@ -206,7 +206,7 @@ def export_result(value, block, config, output, *, inspection_project=None):
         calibration_check = require_design_verification(config, output, endpoint, solution)
         if calibration_check is not None:
             report['block0_verification'] = calibration_check
-        blocks.export_profiles(output, config, endpoint, solution)
+        report['diagnostics'] = blocks.export_profiles(output, config, endpoint, solution)
         write_json(Path(output)/"block2_summary.json", report)
         write_json(Path(output)/"configuration.json", config.as_dict())
         return write_artifact(output, 2, config, endpoint, solution=solution, validation=report, source=source)

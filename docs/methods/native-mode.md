@@ -20,6 +20,29 @@ The initial local comparison took approximately 75 versus 94 seconds for the Pyt
 
 ## Run this checkout
 
+Block 2 exports `block2_geometry.json` (fixed dimensions and exact cubic spline
+controls), a dense geometry CSV, and `block2_target_comparison.{json,csv,png,pdf}`.
+The comparison uses Δβ = βupper − βlower, targets −D cos(θ) and (D/2) sin(θ),
+and the full complex κ residual. Absolute upper/lower β values are included in
+the CSV; the workflow imposes a target on their difference. The JSON reports
+maximum and RMS errors separately at every saved wavelength and verifies the
+reported minimax objective against the coefficients. Plot lines between FDE
+samples are for display; dense analytic targets do not imply dense FDE sampling.
+
+For an eight-hour completion plan, use `block2 --complete-within-seconds 27000
+--max-seconds 28800` with the ordinary endpoint/config/output arguments. The
+explicit alternative `bounded_powell_time_planned` measures the slowest completed
+grid per-sample cost and reserves a fresh midpoint grid, another evaluation's
+margin, and 15 minutes for exports/cleanup, using a 1.5 timing factor. It ends
+optional Powell work and defers further refinement when that reserve is needed;
+it still evaluates the selected geometry's midpoint grid and publishes a complete
+Block 2 handoff with honest convergence flags. It never coarsens the optical
+mesh, changes the endpoints, or loosens tolerances. `--max-seconds` remains a
+last-resort execution guard, not the scheduling mechanism. Solver stalls,
+license loss, or large timing changes cannot be guaranteed to fit an estimate.
+Each improved feasible evaluation also saves a candidate JSON in the current
+attempt. Candidates are explicitly incomplete and cannot serve as block handoffs.
+
 Run these commands from the repository root. The launchers select the local source instead of any other installed `vlac` package.
 
 ```powershell

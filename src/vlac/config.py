@@ -139,6 +139,7 @@ class ConvergenceConfig:
 @dataclass
 class OptimizerConfig:
     method: str = "bounded_powell"
+    complete_within_seconds: float | None = None
     control_points: int = 6
     max_function_evaluations_per_grid: int = 120
     max_grid_refinements: int = 2
@@ -220,6 +221,9 @@ class WorkflowConfig:
     project_root: Path = field(default_factory=Path.cwd, repr=False, compare=False)
 
     def validate(self) -> None:
+        planned = self.optimizer.complete_within_seconds
+        if planned is not None and (isinstance(planned, bool) or not math.isfinite(planned) or planned <= 0):
+            raise ValueError('optimizer.complete_within_seconds must be positive or null.')
         for name in ('max_solves', 'max_seconds'):
             value = getattr(self.execution, name)
             if value is not None and (isinstance(value, bool) or not math.isfinite(value) or value <= 0):

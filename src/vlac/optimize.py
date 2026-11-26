@@ -6,6 +6,8 @@ import numpy as np
 from scipy.optimize import minimize, Bounds
 from scipy.interpolate import PchipInterpolator
 from collections import OrderedDict
+import time
+from .profile_planning import ProfilePlanner, FinalizeProfile
 
 from .config import WorkflowConfig
 from .endpoint import EndpointSearchResult
@@ -68,6 +70,7 @@ def _axis_validation_errors(base, checked, coordinates, refined, axis, delta_sca
 def optimize_profiles(backend, config: WorkflowConfig, bank: MaterialBank, endpoint: EndpointSearchResult, *, progress=None, checkpoint_dir=None):
     """Bounded Powell at the band edges, with a longitudinal FDE grid check."""
     g, d, o = config.geometry, config.device, config.optimizer
+    planner = ProfilePlanner(o.complete_within_seconds, started=getattr(progress, 'started', None))
     ncp = o.control_points
     w0 = np.linspace(endpoint.w1_input_m, endpoint.w1_output_m, ncp)
     dc0 = np.linspace(g.d_c2c_input_m, g.d_c2c_output_m, ncp)
@@ -118,6 +121,8 @@ def optimize_profiles(backend, config: WorkflowConfig, bank: MaterialBank, endpo
         memo = OrderedDict()
         evaluations = 0
         best = float("inf")
+        best_entry = None
+        best_unit = None
         def evaluate(unit):
             key = tuple(float(v) for v in unit)
             if key in memo:
@@ -127,7 +132,9 @@ def optimize_profiles(backend, config: WorkflowConfig, bank: MaterialBank, endpo
             penalty = _check_fabrication_constraints(config,ClampedCubicProfile(d.length_m,w),ClampedCubicProfile(d.length_m,dc))
             if penalty:
                 return penalty,None,None,None
+            sample_started = time.monotonic()
             coefficients = evaluate_design_profiles(backend,config,bank,endpoint,w,dc,z,wavelengths,state="cross")
+            planner.observe(time.monotonic()-sample_started, len(z)*len(wavelengths))
             value,delta_target,kappa_target = minimax_objective(coefficients,z,d.length_m,endpoint.delta_beta_max_rad_per_m)
             memo[key] = value,coefficients,delta_target,kappa_target
             while len(memo)>4:
@@ -135,22 +142,43 @@ def optimize_profiles(backend, config: WorkflowConfig, bank: MaterialBank, endpo
             return memo[key]
 
         def objective(unit):
-            nonlocal evaluations,evaluations_completed,best
+            nonlocal evaluations,evaluations_completed,best,best_entry,best_unit
+            if best_entry is not None and not planner.allows(len(z)*len(wavelengths), (2*len(z)-1)*len(wavelengths)):
+                raise FinalizeProfile()
             if hasattr(backend, '_budget'): backend._budget().check()
             evaluations += 1
             entry = evaluate(unit)
             value = entry[0]
             if entry[1] is not None and value < best:
                 best = value
+                best_entry, best_unit = entry, np.asarray(unit).copy()
                 save_checkpoint(unit, refinement)
+                if progress and o.complete_within_seconds is not None:
+                    from .block_io import write_json, solution_data
+                    candidate_w, candidate_dc = unpack(unit)
+                    candidate = ProfileSolution(candidate_w,candidate_dc,z,wavelengths,entry[2],entry[3],entry[1],
+                        value,history,grid_history,False)
+                    write_json(progress.output_dir/'block2_best_candidate.json',
+                        {'status':'candidate_only', 'execution_completed':False,
+                         'solution':solution_data(candidate), 'planning':planner.report(len(z)*len(wavelengths),(2*len(z)-1)*len(wavelengths))})
             evaluations_completed += 1
             if progress:
                 progress.update(evaluations_completed,detail=f"grid {refinement+1}, normalized Powell evaluation {evaluations}; J={value:.6g}")
+                if o.complete_within_seconds is not None:
+                    progress.checkpoint('profile_work_plan',planner.report(len(z)*len(wavelengths),(2*len(z)-1)*len(wavelengths)))
             return value
 
-        result = minimize(objective,initial,method="Powell",bounds=Bounds(np.zeros_like(initial),np.ones_like(initial)),
-                          options={"maxfev":o.max_function_evaluations_per_grid,"xtol":o.minimum_control_step_fraction,
-                                   "ftol":d.grid_convergence_rtol,"disp":False})
+        planned_finish = False
+        try:
+            result = minimize(objective,initial,method="Powell",bounds=Bounds(np.zeros_like(initial),np.ones_like(initial)),
+                              options={"maxfev":o.max_function_evaluations_per_grid,"xtol":o.minimum_control_step_fraction,
+                                       "ftol":d.grid_convergence_rtol,"disp":False})
+        except FinalizeProfile:
+            from types import SimpleNamespace
+            planned_finish = True
+            result = SimpleNamespace(x=best_unit, success=False,
+                message='Optimization allowance complete; reserved time used for validation and exports.')
+            memo[tuple(float(v) for v in best_unit)] = best_entry
         final_w,final_dc = unpack(result.x)
         value,coefficients,delta_target,kappa_target = evaluate(result.x)
         if coefficients is None:
@@ -159,6 +187,9 @@ def optimize_profiles(backend, config: WorkflowConfig, bank: MaterialBank, endpo
                         "evaluations":evaluations,"objective":value,"success":bool(result.success),
                         "message":str(result.message),"control_w1_m":final_w.tolist(),"control_d_c2c_m":final_dc.tolist(),
                         "coordinate_system":"unit_interval", "normalized_controls":result.x.tolist()})
+        if o.complete_within_seconds is not None:
+            history[-1]['work_plan'] = planner.report(len(z)*len(wavelengths),(2*len(z)-1)*len(wavelengths))
+            history[-1]['planned_finalization'] = planned_finish
         if progress:
             progress.checkpoint(f"profile_optimization_grid_{refinement+1}",history[-1])
         errors, checked_counts = {}, {}
@@ -192,8 +223,16 @@ def optimize_profiles(backend, config: WorkflowConfig, bank: MaterialBank, endpo
         if converged:
             row["stop_reason"] = "longitudinal_check_passed"
             break
+        if planned_finish:
+            row['stop_reason'] = 'completed_within_time_plan'
+            break
         if refinement==o.max_grid_refinements or not requests:
             row["stop_reason"] = "refinement_budget_or_axis_limit"
+            break
+        # Refining commits to a larger optimization grid AND its midpoint check.
+        # Keep the completed, checked grid if that work will consume finalization time.
+        if not planner.allows((2*len(z)-1)*len(wavelengths), (4*len(z)-3)*len(wavelengths)):
+            row['stop_reason'] = 'completed_within_time_plan_refinement_deferred'
             break
         if "z" in requests:
             z = _grid_refine(z)

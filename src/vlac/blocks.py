@@ -32,6 +32,9 @@ def invalidate(output, first_block):
         for name in ('bar_coefficients.csv','coefficients.csv','profiles_and_coefficients.png'):
             (out/name).unlink(missing_ok=True)
     if first_block<=2:
+        from .profile_diagnostics import FILES
+        for name in (*FILES,'block2_best_candidate.json'):
+            (out/name).unlink(missing_ok=True)
         for name in ('cross_coefficients.csv','coefficients.csv','optimized_profiles.csv','optimizer_history.json','profiles_and_coefficients.png'):
             (out/name).unlink(missing_ok=True)
     if first_block<=1:
@@ -104,7 +107,7 @@ def run_profile(backend,config,bank,endpoint,output,*,progress=None,source=None)
     calibration_check = require_design_verification(config, output, endpoint, solution, backend=backend)
     if calibration_check is not None:
         report['block0_verification'] = calibration_check
-    export_profiles(output,config,endpoint,solution)
+    report['diagnostics'] = export_profiles(output,config,endpoint,solution)
     write_json(Path(output)/'configuration.json',config.as_dict())
     report['overall_status'] = overall_status(report)
     write_json(Path(output)/'block2_summary.json',report)

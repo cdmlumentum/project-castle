@@ -504,6 +504,8 @@ def _main(argv: list[str] | None = None) -> int:
             stage.add_argument(flag,required=True,help="Completed upstream block directory or its blockN_result.json.")
             _add_solver_runtime_args(stage)
             if number==2:
+                stage.add_argument("--complete-within-seconds",type=float,default=None,
+                                   help="Plan Powell work from measured costs, reserving final grid checks and exports.")
                 stage.add_argument("--max-evaluations",type=int,default=None,help="Override per-grid optimizer evaluation budget.")
                 stage.add_argument("--max-refinements",type=int,default=None,help="Override profile grid refinement budget.")
             if number==4:
@@ -636,6 +638,7 @@ def _main(argv: list[str] | None = None) -> int:
             config = _execution_overrides(config, _execution_args(args), args.characterize)
             if number==2:
                 updates = {key:value for key,value in (("max_function_evaluations_per_grid",args.max_evaluations),
+                                                      ("complete_within_seconds",args.complete_within_seconds),
                                                       ("max_grid_refinements",args.max_refinements)) if value is not None}
                 config = replace(config,optimizer=replace(config.optimizer,**updates))
             if number==4:
