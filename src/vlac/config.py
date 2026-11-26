@@ -186,6 +186,22 @@ class OutputConfig:
     directory: str = "outputs/run"
     cache_sqlite: str = "outputs/cache/fde_cache.sqlite"
     save_solver_projects: bool = False
+    cache_max_bytes: int = 2_000_000_000
+
+
+@dataclass
+class ExecutionConfig:
+    max_solves: int | None = None
+    max_seconds: float | None = None
+    resume: bool = True
+    native_batch_size: int = 4
+    reuse_verification: bool = True
+
+
+@dataclass
+class CharacterizationConfig:
+    enabled: bool = False
+    max_refinements: int = 4
 
 
 @dataclass
@@ -199,9 +215,25 @@ class WorkflowConfig:
     propagation: PropagationConfig = field(default_factory=PropagationConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
     convergence: ConvergenceConfig = field(default_factory=ConvergenceConfig)
+    execution: ExecutionConfig = field(default_factory=ExecutionConfig)
+    characterization: CharacterizationConfig = field(default_factory=CharacterizationConfig)
     project_root: Path = field(default_factory=Path.cwd, repr=False, compare=False)
 
     def validate(self) -> None:
+        for name in ('max_solves', 'max_seconds'):
+            value = getattr(self.execution, name)
+            if value is not None and (isinstance(value, bool) or not math.isfinite(value) or value <= 0):
+                raise ValueError(f'execution.{name} must be positive or null.')
+        if self.execution.max_solves is not None and not isinstance(self.execution.max_solves, int):
+            raise ValueError('execution.max_solves must be an integer or null.')
+        if isinstance(self.execution.native_batch_size, bool) or not isinstance(self.execution.native_batch_size, int) or not 1 <= self.execution.native_batch_size <= 64:
+            raise ValueError('execution.native_batch_size must be in [1,64].')
+        if isinstance(self.output.cache_max_bytes, bool) or not isinstance(self.output.cache_max_bytes, int) or self.output.cache_max_bytes < 0:
+            raise ValueError('output.cache_max_bytes must be nonnegative (0 means unlimited).')
+        if isinstance(self.characterization.max_refinements, bool) or not isinstance(self.characterization.max_refinements, int) or self.characterization.max_refinements < 0:
+            raise ValueError('characterization.max_refinements must be nonnegative.')
+        if not all(isinstance(value, bool) for value in (self.execution.resume, self.execution.reuse_verification, self.characterization.enabled)):
+            raise ValueError('Resume, verification reuse and characterization flags must be booleans.')
         d, g, m, s, o, e, p = (
             self.device,
             self.geometry,
@@ -436,6 +468,8 @@ def config_from_dict(raw: dict, *, project_root: str | Path | None = None) -> Wo
         propagation=PropagationConfig(**raw.get("propagation", {})),
         output=OutputConfig(**raw.get("output", {})),
         convergence=ConvergenceConfig(**raw.get("convergence", {})),
+        execution=ExecutionConfig(**raw.get("execution", {})),
+        characterization=CharacterizationConfig(**raw.get("characterization", {})),
         project_root=Path(project_root if project_root is not None else raw.get('project_root', Path.cwd())).resolve(),
     )
     cfg.validate()

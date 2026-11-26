@@ -6,7 +6,11 @@ This checkout includes local MODE integration and an optional native Lumerical s
 
 Use `python tools/run_vlac.py ...` to run this checkout explicitly; another `vlac` package may already be installed on this computer. `python tools/run_tests.py` likewise selects this checkout. Installation with `python -m pip install -e .` makes the `vlac` and `vlac-native` entry points available in the selected Python environment.
 
-`config/default.json` retains the original Python calculation path. `config/native.json` selects native LSF mode selection, coefficient extraction and complete profile-grid execution, while retaining the adaptive endpoint search, SciPy Powell optimizer and saved block format. Original reference files are in [docs/references](docs/references/README.md).
+`config/default.json` retains the original Python calculation path. `config/native.json` selects native LSF mode selection, coefficient extraction with reusable raw eigenproblem samples, while retaining the adaptive endpoint search, SciPy Powell optimizer and saved block format. Original reference files are in [docs/references](docs/references/README.md).
+
+## Reusable execution and broadband characterization (v26)
+
+See [v26 changes](CHANGES_v26.md) and [the execution guide](docs/methods/workflow-runtime.md) for durable attempts, shared caches, checkpoints, solve/time budgets, offline inspection/reporting and frozen-profile characterization. The native configuration now retains directly checked cross/bar broadband grids for propagation. The original Python configuration keeps edge-grid behavior unless `--characterize` is supplied. Neither path changes the physical model or reduced-mode formulation.
 
 ## Block 0: domain and mesh calibration (v25)
 
@@ -40,7 +44,7 @@ vlac run --config config/default.json --profile-dir outputs/block2 --out outputs
 vlac run --config config/default.json --bar-dir outputs/block3 --out outputs/full_run
 ~~~
 
-Choose one input flag per invocation. Without one, `run` executes all blocks. Each completed block publishes `blockN_result.json` before the next starts. Later blocks carry the required upstream data and validate configuration/integrity before reuse. A complete v21 endpoint folder needs its summary, configuration, final detuning CSV and passed adaptive/PSO verification report. See [docs/block_handoffs_v22.md](docs/block_handoffs_v22.md) for all commands, compatibility checks, validation scopes, budget overrides and failure recovery.
+Choose one input flag per invocation. Without one, `run` resumes compatible completed blocks by default; use `--no-resume` for a fresh search. Each completed block writes `blockN_result.json` inside its attempt before the next starts. Successful invocation publication uses `latest.json`; interrupted attempts remain available through `last_attempt.json`. Later blocks carry the required upstream data and validate configuration/integrity before reuse. A complete v21 endpoint folder needs its summary, configuration, final detuning CSV and passed adaptive/PSO verification report. See [docs/block_handoffs_v22.md](docs/block_handoffs_v22.md) for all commands, compatibility checks, validation scopes, budget overrides and failure recovery.
 
 ## Model conventions
 

@@ -28,7 +28,9 @@ function vlac_material(name,table,fit_count) {
 }
 
 function vlac_rectangle(name,material,xc,yc,xspan,yspan,enabled) {
-    addrect; set("name",name); set("material",material);
+    if (getnamednumber(name)==0) { addrect; set("name",name); }
+    else { select(name); }
+    set("material",material);
     set("x",xc); set("y",yc); set("x span",xspan); set("y span",yspan);
     set("enabled",enabled);
     return 1;
@@ -66,9 +68,16 @@ function vlac_raw(cfg,geometry,wavelength,upper_enabled,lower_enabled,compact) {
         # Rebuild layout only. Material fits survive ordinary consecutive solves.
         # A zero-mode retry starts an entirely fresh project, as in v23.
         if (attempt>1) { newproject; }
-        switchtolayout; selectall; delete;
-        silica=vlac_material("SiO2_Malitson_1965",cfg.silica_table,cfg.material_fit_max_coefficients);
-        nitride=vlac_material("Si3N4_Luke_2015_provisional",cfg.sin_table,cfg.material_fit_max_coefficients);
+        switchtolayout;
+        reuse=0; if (isfield(cfg,"reuse_scene")) { reuse=cfg.reuse_scene; }
+        if (!reuse) { selectall; delete; }
+        for (old_mesh=1:2) {
+            mesh_name="vlac_local_"+num2str(old_mesh);
+            if (getnamednumber(mesh_name)>0) { select(mesh_name); delete; }
+        }
+        silica="SiO2_Malitson_1965"; nitride="Si3N4_Luke_2015_provisional";
+        if (!materialexists(silica)) { vlac_material(silica,cfg.silica_table,cfg.material_fit_max_coefficients); }
+        if (!materialexists(nitride)) { vlac_material(nitride,cfg.sin_table,cfg.material_fit_max_coefficients); }
         liquid_table=cfg.silica_table;
         liquid_table(:,2)=geometry.liquid_index^2;
         liquid=vlac_material("VLAC_NATIVE_Liquid",liquid_table,cfg.material_fit_max_coefficients);
@@ -78,10 +87,14 @@ function vlac_raw(cfg,geometry,wavelength,upper_enabled,lower_enabled,compact) {
             vlac_rectangle("lower_slab",nitride,0,geometry.h_rib_m/2,xspan,geometry.h_rib_m,lower_enabled);
             vlac_rectangle("upper_slab",nitride,0,upper_y+geometry.h_rib_m/2,xspan,geometry.h_rib_m,upper_enabled);
         }
+        if (geometry.h_rib_m==0) {
+            if (getnamednumber("lower_slab")>0) { select("lower_slab"); delete; }
+            if (getnamednumber("upper_slab")>0) { select("upper_slab"); delete; }
+        }
         ridge_height=geometry.h_wg_m-geometry.h_rib_m;
         vlac_rectangle("lower_ridge",nitride,0,geometry.h_rib_m+ridge_height/2,geometry.w2_m,ridge_height,lower_enabled);
         vlac_rectangle("upper_ridge",nitride,upper_x,upper_y+geometry.h_rib_m+ridge_height/2,geometry.w1_m,ridge_height,upper_enabled);
-        addfde;
+        if (getnamednumber("FDE")==0) { addfde; } else { select("FDE"); }
         set("solver type",3); set("z",0);
         set("x",0); set("x span",xspan);
         set("y",(ymin+ymax)/2); set("y span",ymax-ymin);
@@ -252,13 +265,12 @@ function vlac_extract(beta_upper,beta_lower,beta_plus,beta_minus,previous_kappa,
     return result;
 }
 
-function vlac_coefficients(cfg,geometry,wavelength,refs,previous_kappa,has_previous) {
+function vlac_coefficients_from_raw(cfg,wavelength,refs,previous_kappa,has_previous,raw_upper,raw_lower,candidates) {
     result=struct; result.ok=0;
-    upper_value=vlac_isolated(cfg,geometry,wavelength,"upper",refs,0);
+    upper_value=vlac_choose_mode(raw_upper,refs,"upper",cfg.minimum_te_fraction);
     if (!upper_value.ok) { result.error=upper_value.error; return result; }
-    lower_value=vlac_isolated(cfg,geometry,wavelength,"lower",refs,0);
+    lower_value=vlac_choose_mode(raw_lower,refs,"lower",cfg.minimum_te_fraction);
     if (!lower_value.ok) { result.error=lower_value.error; return result; }
-    candidates=vlac_raw(cfg,geometry,wavelength,1,1,0);
     pair=vlac_choose_pair(candidates,upper_value.mode,lower_value.mode,refs,cfg.minimum_te_fraction);
     if (!pair.ok) { result.error=pair.error; return result; }
     scale=2*pi/wavelength;
@@ -278,7 +290,33 @@ function vlac_coefficients(cfg,geometry,wavelength,refs,previous_kappa,has_previ
     reference=struct; reference.upper=upper_value.mode; reference.lower=lower_value.mode;
     reference.plus=pair.plus; reference.minus=pair.minus;
     result.ok=1; result.error=""; result.coefficients=coefficients; result.reference=reference;
-    result.solves=upper_value.attempts+lower_value.attempts+candidates.attempts;
+    result.solves=0;
+    return result;
+}
+
+function vlac_coefficients(cfg,geometry,wavelength,refs,previous_kappa,has_previous) {
+    upper_raw=vlac_raw(cfg,geometry,wavelength,1,0,0);
+    lower_raw=vlac_raw(cfg,geometry,wavelength,0,1,0);
+    coupled_raw=vlac_raw(cfg,geometry,wavelength,1,1,0);
+    result=vlac_coefficients_from_raw(cfg,wavelength,refs,previous_kappa,has_previous,upper_raw,lower_raw,coupled_raw);
+    result.solves=upper_raw.attempts+lower_raw.attempts+coupled_raw.attempts;
+    return result;
+}
+
+function vlac_select_isolated(cfg,candidates,refs,guide) {
+    return vlac_choose_mode(candidates,refs,guide,cfg.minimum_te_fraction);
+}
+
+function vlac_raw_batch(cfg,requests) {
+    result=struct; result.ok=1; result.error=""; result.solves=0; result.n=0;
+    result.items=cell(length(requests));
+    for (idx=1:length(requests)) {
+        request=requests{idx};
+        value=vlac_raw(cfg,request.geometry,request.wavelength,request.upper,request.lower,request.compact);
+        result.items{idx}=value; result.n=idx;
+        result.solves=result.solves+value.attempts;
+        if (!value.ok) { return result; }
+    }
     return result;
 }
 

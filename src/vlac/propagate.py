@@ -37,7 +37,7 @@ def propagate_rk4(
     beta_lower: np.ndarray,
     kappa: np.ndarray,
     *,
-    launch_layer: int,
+    launch_layer: int | None,
     steps: int,
 ) -> PropagationResult:
     """Integrate dA/dz = i [[beta1,kappa],[kappa,beta2]] A with fixed-step RK4.
@@ -47,8 +47,10 @@ def propagate_rk4(
     basis mode. Cross-section absorption and other imaginary-neff losses are
     included in beta; radiation outside this two-mode basis is not reconstructed.
     """
-    if launch_layer not in (0, 1):
+    if launch_layer not in (None, 0, 1):
         raise ValueError("launch_layer must be 0 (upper) or 1 (lower).")
+    if not isinstance(steps, (int, np.integer)) or steps < 1:
+        raise ValueError("steps must be a positive integer")
     z_samples_m = np.asarray(z_samples_m, dtype=float)
     if len(z_samples_m) < 2 or np.any(np.diff(z_samples_m) <= 0):
         raise ValueError("z samples must be strictly increasing with at least 2 points.")
@@ -57,35 +59,26 @@ def propagate_rk4(
     kap = _complex_pchip(z_samples_m, kappa)
     z0, z1 = float(z_samples_m[0]), float(z_samples_m[-1])
     h = (z1 - z0) / steps
-    reduced_amplitude = np.zeros(2, dtype=complex)
-    reduced_amplitude[launch_layer] = 1.0
+    reduced_amplitude = np.eye(2, dtype=complex) if launch_layer is None else np.eye(2, dtype=complex)[:,launch_layer].copy()
 
-    def rhs(z, a):
-        # Remove the common propagation phase/attenuation before RK4. This is
-        # exact for the scalar mean beta and avoids resolving O(1e7 rad/m)
-        # carrier phase to calculate power transfer.
-        delta = (b1(z) - b2(z)) / 2
-        matrix = np.array([[delta, kap(z)], [kap(z), -delta]], dtype=complex)
-        return 1j * (matrix @ a)
-
+    # Vectorize interpolation over the RK4 half-step lattice once per solve.
+    lattice = np.linspace(z0, z1, 2*steps+1)
+    upper_values, lower_values, coupling = b1(lattice), b2(lattice), kap(lattice)
+    detuning = (upper_values-lower_values)/2
+    mean_imag = ((upper_values+lower_values)/2).imag
+    matrices = np.empty((len(lattice), 2, 2), dtype=complex)
+    matrices[:,0,0], matrices[:,1,1] = detuning, -detuning
+    matrices[:,0,1] = matrices[:,1,0] = coupling
+    matrices *= 1j
     common_attenuation_integral = 0.0
     for i in range(steps):
-        z = z0 + i * h
-        z_mid = z + h / 2
-        z_next = z0 + (i + 1) * h
-        k1 = rhs(z, reduced_amplitude)
-        k2 = rhs(z_mid, reduced_amplitude + h * k1 / 2)
-        k3 = rhs(z_mid, reduced_amplitude + h * k2 / 2)
-        k4 = rhs(z_next, reduced_amplitude + h * k3)
-        reduced_amplitude = reduced_amplitude + h * (
-            k1 + 2 * k2 + 2 * k3 + k4
-        ) / 6
-        beta_mean_im = ((b1(z) + b2(z)) / 2).imag
-        beta_mid_im = ((b1(z_mid) + b2(z_mid)) / 2).imag
-        beta_next_im = ((b1(z_next) + b2(z_next)) / 2).imag
-        common_attenuation_integral += h * (
-            beta_mean_im + 4 * beta_mid_im + beta_next_im
-        ) / 6
+        left, mid, right = matrices[2*i:2*i+3]
+        k1 = left @ reduced_amplitude
+        k2 = mid @ (reduced_amplitude+h*k1/2)
+        k3 = mid @ (reduced_amplitude+h*k2/2)
+        k4 = right @ (reduced_amplitude+h*k3)
+        reduced_amplitude += h*(k1+2*k2+2*k3+k4)/6
+        common_attenuation_integral += h*(mean_imag[2*i]+4*mean_imag[2*i+1]+mean_imag[2*i+2])/6
     # The discarded common phase is irrelevant to port powers. Retain common
     # amplitude attenuation so absolute guided output includes material loss.
     amplitude = reduced_amplitude * np.exp(-common_attenuation_integral)
@@ -179,6 +172,26 @@ def port_metrics(
     }
 
 
+def propagate_both(z, upper, lower, kappa, settings):
+    """Share interpolation and RK4 matrices, retaining each launch's stopping step."""
+    steps, previous, results = settings.rk4_steps_initial, None, [None, None]
+    while True:
+        pair = propagate_rk4(z, upper, lower, kappa, launch_layer=None, steps=steps)
+        if previous is not None:
+            denom = np.maximum(np.maximum(pair.output_powers, previous.output_powers), settings.power_convergence_rtol*1e-3)
+            changes = np.max(np.abs(pair.output_powers-previous.output_powers)/denom, axis=0)
+        else:
+            changes = np.full(2, np.inf)
+        for launch in (0, 1):
+            converged = changes[launch] <= settings.power_convergence_rtol
+            if results[launch] is None and (converged or steps >= settings.rk4_steps_max):
+                results[launch] = PropagationResult(pair.output_amplitudes[:,launch], pair.output_powers[:,launch],
+                    float(sum(pair.output_powers[:,launch])), steps, bool(converged), float(changes[launch]))
+        if all(value is not None for value in results): return results
+        previous = pair
+        steps = min(2*steps, settings.rk4_steps_max)
+
+
 def propagate_state(
     z_samples_m: np.ndarray,
     coefficients_by_wavelength: list[list[Coefficients]],
@@ -201,15 +214,7 @@ def propagate_state(
         b1 = np.array([c.beta_upper for c in coeff_row], dtype=complex)
         b2 = np.array([c.beta_lower for c in coeff_row], dtype=complex)
         kappa = np.array([c.kappa for c in coeff_row], dtype=complex)
-        for launch_layer in (0, 1):
-            result = propagate_converged(
-                z_samples_m,
-                b1,
-                b2,
-                kappa,
-                launch_layer=launch_layer,
-                settings=settings,
-            )
+        for launch_layer, result in enumerate(propagate_both(z_samples_m, b1, b2, kappa, settings)):
             row = port_metrics(
                 result,
                 state=state,

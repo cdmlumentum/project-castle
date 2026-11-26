@@ -65,7 +65,7 @@ def _axis_validation_errors(base, checked, coordinates, refined, axis, delta_sca
     return error
 
 
-def optimize_profiles(backend, config: WorkflowConfig, bank: MaterialBank, endpoint: EndpointSearchResult, *, progress=None):
+def optimize_profiles(backend, config: WorkflowConfig, bank: MaterialBank, endpoint: EndpointSearchResult, *, progress=None, checkpoint_dir=None):
     """Bounded Powell at the band edges, with a longitudinal FDE grid check."""
     g, d, o = config.geometry, config.device, config.optimizer
     ncp = o.control_points
@@ -79,6 +79,33 @@ def optimize_profiles(backend, config: WorkflowConfig, bank: MaterialBank, endpo
     history, grid_history = [], []
     converged = False
     evaluations_completed = 0
+    checkpoint = None
+    start_refinement = 0
+    best = float('inf')
+    if checkpoint_dir is not None:
+        from .checkpoints import Checkpoint
+        from .provenance import checkpoint_identity
+        from .block_io import endpoint_data
+        from dataclasses import asdict
+        settings = asdict(o)
+        settings.pop('max_function_evaluations_per_grid'); settings.pop('max_grid_refinements')
+        identity = checkpoint_identity(config, 2, {'endpoint': endpoint_data(endpoint), 'optimizer': settings,
+            'initial_z': d.z_samples_initial, 'maximum_z': d.z_samples_max})
+        checkpoint = Checkpoint(checkpoint_dir, 'powell', identity)
+        saved = checkpoint.load() if config.execution.resume else None
+        if saved:
+            initial, z = saved['controls'], saved['z']
+            start_refinement = saved['refinement']
+            history, grid_history = saved['history'], saved['grid_history']
+            if saved.get('converged_solution') is not None:
+                return saved['converged_solution']
+            if progress: progress.note('Resuming Powell from saved feasible controls; optimizer directions restart.', force=True)
+
+    def save_checkpoint(controls, refinement, completed=None):
+        if checkpoint:
+            checkpoint.save({'controls': np.asarray(controls), 'z': z, 'refinement': refinement,
+                'history': history, 'grid_history': grid_history, 'converged_solution': completed,
+                'resume_method': 'Powell warm restart; not exact optimizer continuation'})
     if progress:
         progress.start_stage("Cross-state profile optimization", unit="objective evaluations")
 
@@ -87,9 +114,10 @@ def optimize_profiles(backend, config: WorkflowConfig, bank: MaterialBank, endpo
         return (np.r_[endpoint.w1_input_m,physical[:ncp-2],endpoint.w1_output_m],
                 np.r_[g.d_c2c_input_m,physical[ncp-2:],g.d_c2c_output_m])
 
-    for refinement in range(o.max_grid_refinements+1):
+    for refinement in range(start_refinement, max(start_refinement, o.max_grid_refinements)+1):
         memo = OrderedDict()
         evaluations = 0
+        best = float("inf")
         def evaluate(unit):
             key = tuple(float(v) for v in unit)
             if key in memo:
@@ -107,9 +135,14 @@ def optimize_profiles(backend, config: WorkflowConfig, bank: MaterialBank, endpo
             return memo[key]
 
         def objective(unit):
-            nonlocal evaluations,evaluations_completed
+            nonlocal evaluations,evaluations_completed,best
+            if hasattr(backend, '_budget'): backend._budget().check()
             evaluations += 1
-            value = evaluate(unit)[0]
+            entry = evaluate(unit)
+            value = entry[0]
+            if entry[1] is not None and value < best:
+                best = value
+                save_checkpoint(unit, refinement)
             evaluations_completed += 1
             if progress:
                 progress.update(evaluations_completed,detail=f"grid {refinement+1}, normalized Powell evaluation {evaluations}; J={value:.6g}")
@@ -155,6 +188,7 @@ def optimize_profiles(backend, config: WorkflowConfig, bank: MaterialBank, endpo
         grid_history.append(row)
         if progress:
             progress.checkpoint(f"profile_grid_validation_{refinement+1}",row)
+        save_checkpoint(result.x, refinement)
         if converged:
             row["stop_reason"] = "longitudinal_check_passed"
             break
@@ -164,7 +198,10 @@ def optimize_profiles(backend, config: WorkflowConfig, bank: MaterialBank, endpo
         if "z" in requests:
             z = _grid_refine(z)
         initial = np.clip(result.x,0,1)
+        save_checkpoint(initial, refinement+1)
     if progress:
         progress.finish_stage(f"J={value:.6g}; {evaluations_completed} objective evaluations; grid_converged={converged}")
-    return ProfileSolution(final_w,final_dc,z,wavelengths,delta_target,kappa_target,coefficients,value,
-                           history,grid_history,converged)
+    solution = ProfileSolution(final_w,final_dc,z,wavelengths,delta_target,kappa_target,coefficients,value,
+                               history,grid_history,converged)
+    save_checkpoint(result.x, refinement, solution if converged and result.success else None)
+    return solution

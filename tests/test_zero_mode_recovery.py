@@ -76,7 +76,7 @@ class ZeroModeTests(unittest.TestCase):
             with patch.object(b,'_mode_candidates',return_value=fixture_modes()) as call:
                 self.raw(b)
                 with closing(sqlite3.connect(b.cache.path)) as db:
-                    key=db.execute('SELECT cache_key FROM coefficient_cache').fetchone()[0]
+                    key=db.execute('SELECT cache_key FROM cache_v2').fetchone()[0]
                 b.cache.put(key,[]);b._raw_memory.clear()
                 self.assertTrue(self.raw(b))
                 self.assertEqual(call.call_count,2)

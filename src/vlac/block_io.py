@@ -20,7 +20,7 @@ from .endpoint_constraints import require_endpoint_constraints
 from .modes import Coefficients
 from .profiles import ProfileSolution, target_profiles
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 MODEL = 'full_width_slabs_v21;negative_to_positive_cross_target'
 COMPLEX_FIELDS = {'beta_upper','beta_lower','beta_plus','beta_minus','delta_beta','delta_pm','delta_12','kappa'}
 OPTIONAL_FLOATS = {'kappa_profile_check','overlap_upper_lower'}
@@ -218,7 +218,7 @@ def validate_solution(solution, endpoint, config):
     return validate_grid(solution.cross_coefficients,solution,config)
 
 
-def write_artifact(output, block, config, endpoint, *, solution=None, bar=None, performance=None, validation=None, source=None):
+def write_artifact(output, block, config, endpoint, *, solution=None, bar=None, performance=None, validation=None, source=None, characterization=None):
     validate_endpoint(endpoint,config)
     payload = {'endpoint': endpoint_data(endpoint)}
     if solution is not None:
@@ -228,9 +228,21 @@ def write_artifact(output, block, config, endpoint, *, solution=None, bar=None, 
         validate_grid(bar,solution,config)
         payload['bar_coefficients'] = coefficient_data(bar)
     if performance is not None: payload['performance'] = clean(performance)
+    if solution is not None:
+        payload['geometry'] = geometry_data(config, endpoint, solution)
+    if characterization is not None:
+        from .characterize import validate_characterization
+        validate_characterization(characterization, config, endpoint, solution)
+        payload['characterization'] = characterization
+    from .provenance import artifact_identity
+    from .runtime import overall_status
+    validation = dict(validation or {})
+    validation['overall_status'] = overall_status(validation)
     artifact = {'schema_version':SCHEMA_VERSION,'block':block,'status':'complete','created_utc':datetime.now(timezone.utc).isoformat(),
                 'physics_signature':physics_signature(config,block),'config':config.as_dict(),
                 'payload':payload,'validation':validation or {},'source':source or {}}
+    artifact['provenance'] = artifact_identity(config)
+    artifact['content_id'] = digest({'physics': artifact['physics_signature'], 'payload': payload})
     artifact['sha256'] = digest(artifact)
     write_json(Path(output)/f'block{block}_result.json',artifact)
     return artifact
@@ -238,11 +250,14 @@ def write_artifact(output, block, config, endpoint, *, solution=None, bar=None, 
 
 def _read_artifact(path, block, config):
     artifact = json.loads(path.read_text(encoding='utf-8'))
-    if artifact.get('schema_version')!=SCHEMA_VERSION or artifact.get('block')!=block or artifact.get('status')!='complete':
+    if artifact.get('schema_version') not in {1,SCHEMA_VERSION} or artifact.get('block')!=block or artifact.get('status')!='complete':
         raise ValueError('Unsupported, incomplete, or wrong-block artifact: '+str(path))
     expected = artifact.pop('sha256',None)
     if expected!=digest(artifact): raise ValueError('Saved artifact checksum mismatch: '+str(path))
     artifact['sha256'] = expected
+    if artifact['schema_version'] >= 2:
+        content = digest({'physics': artifact['physics_signature'], 'payload': artifact['payload']})
+        if content != artifact.get('content_id'): raise ValueError('Saved artifact content identity mismatch')
     assert_compatible(artifact['physics_signature'],config,block)
     endpoint = decode_endpoint(artifact['payload']['endpoint'])
     validate_endpoint(endpoint,config)
@@ -251,14 +266,20 @@ def _read_artifact(path, block, config):
     if block>=2:
         solution = decode_solution(artifact['payload']['solution'])
         validate_solution(solution,endpoint,config)
+        if artifact['schema_version'] >= 2 and artifact['payload'].get('geometry') != geometry_data(config, endpoint, solution):
+            raise ValueError('Saved frozen geometry disagrees with optimized controls')
     if block>=3:
         bar = decode_coefficients(artifact['payload']['bar_coefficients'])
         validate_grid(bar,solution,config)
+    if 'characterization' in artifact['payload']:
+        from .characterize import validate_characterization
+        validate_characterization(artifact['payload']['characterization'], config, endpoint, solution)
     return endpoint,solution,bar,artifact
 
 
 def load_block(directory, block, config):
-    path = Path(directory).expanduser().resolve()
+    from .runtime import resolve_published
+    path = resolve_published(directory)
     if path.is_file():
         if path.name!=f'block{block}_result.json': raise ValueError('Expected a block result directory or matching block result JSON.')
     else: path = path/f'block{block}_result.json'
@@ -309,5 +330,15 @@ def load_v21_endpoint(directory, config):
 
 def source_record(artifact):
     return {'block':artifact.get('block',1),'sha256':artifact['sha256'],
+            'content_id':artifact.get('content_id'), 'provenance':artifact.get('provenance'),
             'validation':artifact.get('validation',{}),'format':artifact.get('format','vlac_block_json'),
             'backend_name':artifact.get('source',{}).get('backend_name','saved_fde_coefficients')}
+
+
+def geometry_data(config, endpoint, solution):
+    """Frozen controls are independent of optimization/characterization grids."""
+    value = {'schema_version': 1, 'units': 'SI', 'length_m': config.device.length_m,
+             'w1_control_m': clean(solution.w1_control_m), 'd_c2c_control_m': clean(solution.d_c2c_control_m),
+             'h_gap_m': endpoint.h_gap_m, 'h_rib_m': endpoint.h_rib_m,
+             'geometry': clean(config.as_dict()['geometry'])}
+    return dict(value, geometry_id=digest(value))

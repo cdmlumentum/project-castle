@@ -130,6 +130,18 @@
   "output": {
     "directory": "outputs/run",
     "cache_sqlite": "outputs/cache/fde_cache.sqlite",
-    "save_solver_projects": false
+    "save_solver_projects": false,
+    "cache_max_bytes": 2000000000
+  },
+  "execution": {
+    "max_solves": 12000,
+    "max_seconds": 14400,
+    "resume": true,
+    "native_batch_size": 4,
+    "reuse_verification": true
+  },
+  "characterization": {
+    "enabled": false,
+    "max_refinements": 4
   }
 }

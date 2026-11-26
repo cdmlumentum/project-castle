@@ -16,6 +16,7 @@ import numpy as np
 
 from test_python_pso import ROOT, SyntheticBackend
 from vlac import cli, blocks
+from vlac.runtime import resolve_published
 from vlac.block_io import digest, load_block, write_json, physics_signature
 from vlac.config import load_config
 from vlac.modes import extract_coupling
@@ -120,16 +121,16 @@ class BlockHandoffTests(unittest.TestCase):
         self.assertGreater((self.b1/'endpoint_betas_linear.png').stat().st_size,1000)
         self.assertGreater((self.b1/'endpoint_mode_profiles.png').stat().st_size,1000)
 
-    def test_failed_rerun_removes_old_inspection_artifacts(self):
+    def test_failed_rerun_preserves_successful_inspection_artifacts(self):
         from vlac.endpoint_diagnostics import FILES
-        self.b1.mkdir()
-        for name in (*FILES,'block1_result.json'):
-            (self.b1/name).write_text('old synthetic test artifact')
+        self.assertEqual(self.command('block1','--out',self.b1,backend=InspectionBackend),0)
+        previous = load_block(self.b1,1,self.config)[3]['sha256']
         class Failure(InspectionBackend):
             def preflight(self, wavelength):
                 raise RuntimeError('Synthetic startup failure')
         self.assertEqual(self.command('block1','--out',self.b1,backend=Failure),2)
-        self.assertFalse(any((self.b1/name).exists() for name in (*FILES,'block1_result.json')))
+        self.assertTrue(all((self.b1/name).exists() for name in (*FILES,'block1_result.json')))
+        self.assertEqual(load_block(self.b1,1,self.config)[3]['sha256'],previous)
 
     def test_inspection_save_failure_does_not_publish_success(self):
         class Failure(InspectionBackend):
@@ -166,10 +167,10 @@ class BlockHandoffTests(unittest.TestCase):
         self.assertFalse(artifact['validation']['optimization_converged'])
         self.assertTrue((self.b2/'block2_validation_report.json').is_file())
         with patch('vlac.blocks.optimize_profiles',side_effect=AssertionError('Block 2 repeated')):
-            self.assertEqual(self.command('validate-block3','--profile-dir',self.b2,'--out',self.b3),0)
+            self.assertEqual(self.command('validate-block3','--profile-dir',self.b2,'--out',self.b3),3)
         self.assertEqual({g.state for g,w in RecordingBackend.instances[-1].coefficient_calls},{'bar'})
         def forbidden(*args,**kwargs): raise AssertionError('MODE launched for Block 4')
-        self.assertEqual(self.command('validate-block4','--bar-dir',self.b3,'--out',self.b4,backend=forbidden),0)
+        self.assertEqual(self.command('validate-block4','--bar-dir',self.b3,'--out',self.b4,backend=forbidden),3)
         with (self.b4/'performance_by_launch.csv').open(newline='') as stream: rows=list(csv.DictReader(stream))
         self.assertEqual(len(rows),8)
         self.assertEqual({(r['state'],r['launch_layer']) for r in rows},{(s,l) for s in ('cross','bar') for l in ('upper','lower')})
@@ -192,6 +193,7 @@ class BlockHandoffTests(unittest.TestCase):
 
     def test_legacy_v21_endpoint_directory_import_without_search(self):
         self.endpoint()
+        (self.b1/'latest.json').unlink()
         (self.b1/'block1_result.json').unlink()
         endpoint,_,_,source = load_block(self.b1,1,self.config)
         self.assertTrue(source['legacy_import'])
@@ -202,6 +204,7 @@ class BlockHandoffTests(unittest.TestCase):
 
     def test_legacy_import_rejects_disagreeing_verification_and_finite_slabs(self):
         self.endpoint()
+        (self.b1/'latest.json').unlink()
         (self.b1/'block1_result.json').unlink()
         original = (self.b1/'configuration.json').read_text()
         raw = json.loads(original);raw['geometry']['rib_slab_overhang_m']=2e-6
@@ -225,15 +228,15 @@ class BlockHandoffTests(unittest.TestCase):
             with self.subTest(changed=changed),self.assertRaisesRegex(ValueError,'incompatible'):load_block(self.b1,1,changed)
         self.assertNotEqual(physics_signature(self.config,2),physics_signature(runtime,2))
 
-    def test_corrupt_checkpoint_and_failed_input_remove_stale_target(self):
+    def test_corrupt_input_leaves_previous_target_intact(self):
         self.endpoint()
         raw = json.loads((self.b1/'block1_result.json').read_text())
         raw['payload']['endpoint']['w1_input_m']+=1e-8
-        write_json(self.b1/'block1_result.json',raw)
+        write_json(resolve_published(self.b1)/'block1_result.json',raw)
         self.b2.mkdir();(self.b2/'block2_result.json').write_text('{"stale":true}')
         self.assertEqual(self.command('block2','--endpoint-dir',self.b1,'--out',self.b2,
                                       backend=lambda *a,**k: self.fail('MODE launched before input checks')),2)
-        self.assertFalse((self.b2/'block2_result.json').exists())
+        self.assertEqual((self.b2/'block2_result.json').read_text(),'{"stale":true}')
         self.assertTrue((self.b2/'block2_failure.json').exists())
         with self.assertRaisesRegex(ValueError,'checksum'):load_block(self.b1,1,self.config)
 
@@ -247,9 +250,11 @@ class BlockHandoffTests(unittest.TestCase):
                      lambda s:s['cross_coefficients'][0][0]['delta_beta'].__setitem__('real',9999.)]
         for change in mutations:
             raw = deepcopy(original);change(raw['payload']['solution']);raw.pop('sha256');raw['sha256']=digest(raw)
-            write_json(self.b2/'block2_result.json',raw)
+            raw['content_id']=digest({'physics':raw['physics_signature'],'payload':raw['payload']})
+            raw.pop('sha256');raw['sha256']=digest(raw)
+            write_json(resolve_published(self.b2)/'block2_result.json',raw)
             with self.subTest(change=change),self.assertRaises(ValueError):load_block(self.b2,2,self.config)
-        write_json(self.b2/'block2_result.json',original)
+        write_json(resolve_published(self.b2)/'block2_result.json',original)
         changed_length = replace(self.config,device=replace(self.config.device,length_m=2e-3))
         with self.assertRaisesRegex(ValueError,'length_m'):load_block(self.b2,2,changed_length)
 
@@ -279,11 +284,12 @@ class BlockHandoffTests(unittest.TestCase):
         out = self.root/'full'
         with patch('vlac.blocks.run_bar',side_effect=RuntimeError('bar fixture failure')):
             self.assertEqual(self.command('run','--out',out),2)
-        self.assertTrue((out/'block1_result.json').is_file())
-        self.assertTrue((out/'block2_result.json').is_file())
+        partial = out/json.loads((out/'last_attempt.json').read_text())['attempt']
+        self.assertTrue((partial/'block1_result.json').is_file())
+        self.assertTrue((partial/'block2_result.json').is_file())
         self.assertFalse((out/'block3_result.json').exists())
         with patch('vlac.cli.search_endpoints',side_effect=AssertionError('endpoint repeated')),patch('vlac.blocks.optimize_profiles',side_effect=AssertionError('profile repeated')):
-            self.assertEqual(self.command('run','--profile-dir',out,'--out',out),0)
+            self.assertEqual(self.command('run','--out',out),0)
         self.assertEqual({g.state for g,w in RecordingBackend.instances[-1].coefficient_calls},{'bar'})
         self.assertTrue((out/'block4_result.json').is_file())
 

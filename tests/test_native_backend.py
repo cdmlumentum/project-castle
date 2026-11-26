@@ -47,8 +47,9 @@ class NativeBackendTests(unittest.TestCase):
             for number in (1, 2, 3):
                 self.assertIn(f"vlac_block{number}", (bundle/f"block{number}.lsf").read_text())
             entry = (bundle/'block1.lsf').read_text()
-            self.assertLess(entry.index('vlac_block1_inspection'),entry.index('save("block1.lms")'))
-            self.assertLess(entry.index('rm("block1_native.mat")'),entry.index('block1_native=vlac_block1'))
+            self.assertLess(entry.index('vlac_block1_inspection'),entry.rindex('save("block1.lms")'))
+            self.assertNotIn('rm(', entry)
+            self.assertLess(entry.index('incomplete_native_attempt'),entry.index('block1_native=vlac_block1'))
             self.assertIn('result.mode_profiles=profiles', (bundle/'vlac_blocks.lsf').read_text())
             manifest = json.loads((bundle/"manifest.json").read_text())
             self.assertEqual(manifest["standalone_algorithms"]["block2"], "coordinate_pattern")
@@ -59,12 +60,57 @@ class NativeBackendTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             backend = self.adapter(folder)
             payload = {"mode": asdict(fixture_modes()[0]), "overlap": 1.}
-            with patch.object(backend, "_call_native", return_value=payload) as call:
+            raw = {'ok': 1., 'error': '', 'n': 1., 'attempts': 1., 'items': [asdict(fixture_modes()[0])]}
+            def dispatch(function, args, **kwargs):
+                return {'ok': 1., 'n': 1., 'items': [raw]} if function == 'vlac_raw_batch' else payload
+            with patch.object(backend, "_call_native", side_effect=dispatch) as call:
                 for _ in range(2):
                     backend.solve_isolated_mode(geometry(self.config), 1.3e-6, guide="upper")
-                self.assertEqual(call.call_count, 1)
-                backend.solve_isolated_mode(geometry(self.config), 1.3e-6, guide="upper", use_cache=False)
                 self.assertEqual(call.call_count, 2)
+                backend.solve_isolated_mode(geometry(self.config), 1.3e-6, guide="upper", use_cache=False)
+                self.assertEqual(call.call_count, 4)
+
+    def test_partial_raw_batch_preserves_success_and_distinguishes_field_failure(self):
+        raw={'ok':1.,'error':'','attempts':1.,'n':2.,'items':[asdict(m) for m in fixture_modes()]}
+        with tempfile.TemporaryDirectory() as folder:
+            backend=self.adapter(folder)
+            requests=[backend._raw_request(geometry(self.config,width=w),1.3e-6,True,False) for w in (1e-6,1.1e-6)]
+            response={'n':2.,'items':[raw,{'ok':0.,'error':'unusable_fields'}]}
+            with patch.object(backend,'_call_native',return_value=response):
+                with self.assertRaisesRegex(RuntimeError,'unusable_fields'):backend._raw_packets(requests)
+            with patch.object(backend,'_call_native',side_effect=AssertionError('successful sample repeated')):
+                backend._native_memory.clear()
+                self.assertEqual(backend._raw_packets(requests[:1])[0]['n'],2.)
+            self.assertEqual(backend.cache.count(),1)
+
+    def test_tracking_references_encode_complex_scalars_for_v221(self):
+        from vlac.native_backend import reference_to_native
+        from vlac.modes import ModeReference
+        modes=fixture_modes()
+        packet=reference_to_native(ModeReference(modes[0],modes[1],tuple(modes)))
+        for value in packet.values():
+            self.assertIsInstance(value['neff'],np.ndarray)
+            self.assertEqual(value['neff'].shape,(1,1))
+
+    def test_v73_numeric_cell_reader_preserves_orientation_and_complex_data(self):
+        import h5py
+        from vlac.mat_io import load_mat
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'fixture.mat'
+            expected=np.arange(6).reshape(2,3)+2j
+            with h5py.File(path,'w') as file:
+                group=file.create_group('packet');group.attrs['MATLAB_class']=np.bytes_('struct')
+                dtype=np.dtype([('real','<f8'),('imag','<f8')])
+                data=np.empty((3,2),dtype=dtype);data['real']=expected.real.T;data['imag']=expected.imag.T
+                field=group.create_dataset('field',data=data);field.attrs['MATLAB_class']=np.bytes_('double')
+                text=group.create_dataset('label',data=np.array([ord(c) for c in 'SYNTHETIC'],dtype='u2').reshape(-1,1))
+                text.attrs['MATLAB_class']=np.bytes_('char')
+                cells=group.create_dataset('cells',(1,1),dtype=h5py.ref_dtype);cells.attrs['MATLAB_class']=np.bytes_('cell')
+                cells[0,0]=field.ref
+            packet=load_mat(path)['packet']
+            np.testing.assert_array_equal(packet['field'],expected)
+            np.testing.assert_array_equal(packet['cells'][0],expected)
+            self.assertEqual(packet['label'],'SYNTHETIC')
 
     def test_native_reference_round_trip_preserves_complex_modes(self):
         # Synthetic lossy/complex fields exercise every guide and supermode slot.
@@ -108,13 +154,22 @@ class NativeBackendTests(unittest.TestCase):
         mode = replace(fixture_modes()[0], neff=1.9+2e-7j)
         backend.session = Mock()
         backend.session.putv.side_effect = lambda name, value: supported(value)
-        backend.session.getv.return_value = {"ok": 1., "mode": asdict(mode), "overlap": 1.}
+        backend._native_loaded = True
+        from vlac.native_backend import snapshot_to_native
+        raw = {'ok':1.,'error':'','n':1.,'attempts':1.,'items':[snapshot_to_native(mode)]}
+        def result(name):
+            script = backend.session.eval.call_args.args[0]
+            if 'vlac_raw_batch(' in script:
+                return {'ok':1.,'n':1.,'solves':1.,'items':[raw]}
+            return {"ok":1.,"mode":asdict(mode),"overlap":1.}
+        backend.session.getv.side_effect = result
         first, _ = backend.solve_isolated_mode(geometry(self.config), 1.26e-6, guide="lower")
         tracked, overlap = backend.solve_isolated_mode(geometry(self.config), 1.34e-6,
                                                        guide="lower", reference=first)
         self.assertEqual(tracked.neff, mode.neff)
         self.assertEqual(overlap, 1.)
-        self.assertEqual(backend.session.eval.call_count, 2)
+        self.assertEqual(sum('vlac_raw_batch(' in call.args[0] for call in backend.session.eval.call_args_list),2)
+        self.assertEqual(sum('vlac_select_isolated(' in call.args[0] for call in backend.session.eval.call_args_list),2)
 
     def test_sub_float_display_changes_do_not_collide_in_native_cache(self):
         backend = self.adapter()

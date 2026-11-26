@@ -21,6 +21,8 @@ import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 
 from .cache import SQLiteCache, stable_key
+from .provenance import optical_identity, file_digest
+from .runtime import RunBudget
 from .config import WorkflowConfig
 from .geometry import CrossSectionGeometry, rectangles_for_cross_section
 from .materials import (
@@ -76,15 +78,41 @@ class LumapiBackend:
             config.solver.mesh_accuracy if mesh_accuracy is None else mesh_accuracy
         )
         self.progress = progress
-        self.cache = SQLiteCache(cache_path, progress=progress) if cache_path else None
-        self._lumapi = self._import_lumapi()
-        self.session = self._open_session()
+        self.cache = SQLiteCache(cache_path, progress=progress, max_bytes=config.output.cache_max_bytes) if cache_path else None
+        self._session = None
+        self._preflight_wavelength = None
+        self.budget = RunBudget(config.execution)
         self._closed = False
         self._project_ready = False
         self._installed_material_names = set()
         self._raw_memory = OrderedDict()
         self.performance_stats = {}
         self._build_domain()
+
+    @property
+    def session(self):
+        """Acquire a license only when a cache miss needs MODE."""
+        if getattr(self, '_session', None) is None:
+            self._lumapi = self._import_lumapi()
+            self._session = self._open_session()
+            wavelength = getattr(self, '_preflight_wavelength', None)
+            self._preflight_wavelength = None
+            try:
+                if wavelength is not None:
+                    self.preflight(wavelength)
+            except BaseException:
+                self.close()
+                raise
+        return self._session
+
+    @session.setter
+    def session(self, value):
+        self._session = value
+
+    def _budget(self):
+        if not hasattr(self, 'budget'):
+            self.budget = RunBudget(self.config.execution)
+        return self.budget
 
     def _mesh_cell_counts(self, mesh_level: int | None = None) -> tuple[int, int]:
         """Map the configured refinement level to native MODE FDE mesh cells."""
@@ -150,6 +178,11 @@ class LumapiBackend:
 
     def preflight(self, wavelength_m: float) -> None:
         """Run a tiny empty-domain eigenmode solve to check the FDE license path."""
+        if getattr(self, '_session', None) is None:
+            self._preflight_wavelength = wavelength_m
+            return
+        self._budget().check(1)
+        self._budget().consume(1)
         script = f"""
             newproject;
             addfde;
@@ -331,7 +364,8 @@ class LumapiBackend:
     def close(self) -> None:
         if not self._closed:
             try:
-                self.session.close()
+                if self._session is not None:
+                    self._session.close()
             finally:
                 self._closed = True
 
@@ -474,6 +508,7 @@ class LumapiBackend:
         cells = self._mesh_cell_counts(mesh_accuracy) if mesh_cells_override is None else mesh_cells_override
         rects = self._active_rectangles(geometry, include_upper, include_lower)
         key = stable_key({
+            "provenance": optical_identity(self.config),
             "kind": "raw_eigenmodes_explicit_xy_v23", "rectangles": [asdict(r) for r in rects],
             "liquid_index": float(geometry.liquid_index), "wavelength_m": float(wavelength_m),
             "domain_m": [self.x_span_m, self.y_min_m, self.y_max_m],
@@ -621,6 +656,8 @@ class LumapiBackend:
         with self._timed("geometry_setup"):
             self.session.eval(script)
         self._project_ready, self._project_signature, self._layout_names = True, signature, names
+        self._budget().check(1)
+        self._budget().consume(1)
         token = self.progress.solver_started() if self.progress else None
         try:
             with self._timed("eigensolve"):
@@ -797,6 +834,7 @@ vlac_mode_data.cards=vlac_cards;
         previous_kappa: complex | None = None,
     ) -> str:
         payload = {
+            "provenance": optical_identity(self.config),
             "geometry_model": "full_width_slabs_explicit_xy_v23",
             "block0_certificate_id": self.config.solver.calibration['certificate_id'] if self.config.solver.calibration else None,
             "selection": self._selection_signature(),
@@ -878,8 +916,8 @@ vlac_mode_data.cards=vlac_cards;
         ):
             path = self.config.resolved_path(raw_path)
             if path is not None and path.exists():
-                stat = path.stat()
-                result[label] = [str(path), stat.st_size, stat.st_mtime_ns]
+                result[label] = file_digest(path)
+        result['provenance'] = optical_identity(self.config)
         return result
 
     def solve_bare_modes(

@@ -1,6 +1,7 @@
 """Run licensed v23/native parity checks without installing the package."""
 
 from dataclasses import asdict, replace
+from contextlib import contextmanager
 from datetime import datetime, timezone
 import argparse
 import json
@@ -23,12 +24,13 @@ from vlac.modes import extract_coupling, field_overlap
 from vlac.native_backend import NativeLumapiBackend, column, scalar, load_native_functions
 from scipy.interpolate import PchipInterpolator
 from vlac.solver import LumapiBackend
-from vlac.native_mode import prepare_bundle, export_result
+from vlac.native_mode import prepare_bundle, export_result, execute_bundle
 
 
 def math_checks(backend):
     session = backend.session
     checks = []
+    load_native_functions(session, "vlac_core.lsf")
     load_native_functions(session, "vlac_blocks.lsf")
     positions = np.linspace(0, 1.5e-3, 19)
     for count in (4, 6, 9):
@@ -72,10 +74,20 @@ def math_checks(backend):
     return checks
 
 
-def native_block_smoke(backend):
+@contextmanager
+def mode_temporary_directory(session):
+    with tempfile.TemporaryDirectory() as folder:
+        try:
+            yield folder
+        finally:
+            # MODE holds its working directory open on Windows.
+            session.eval('cd('+json.dumps(ROOT.as_posix())+');')
+
+
+def native_block_smoke(backend, output=None):
     """Exercise standalone control flow with explicitly synthetic optical data."""
     session = backend.session
-    with tempfile.TemporaryDirectory() as folder:
+    with mode_temporary_directory(session) as folder:
         bundle = prepare_bundle(backend.config, folder, width_samples=3)
         session.eval("matlabload(" + json.dumps((bundle/"native_config.mat").as_posix()) + ");")
         synthetic = r'''
@@ -152,11 +164,26 @@ function vlac_block1_inspection(cfg,endpoint) {
         value = session.getv('block1_native')
         if not bool(scalar(value['ok'])) or value.get('inspection_kind') != 'full_two_guide_input_cross_min_wavelength_v1':
             raise AssertionError('Generated Block 1 entry did not complete its synthetic inspection export')
+        if output is not None:
+            import shutil
+            shutil.copy2(bundle/'block1_native.mat', output/'synthetic_native_import_fixture.mat')
+        from unittest.mock import patch
+        with patch.object(NativeLumapiBackend, '_import_lumapi', side_effect=AssertionError('Offline MAT import opened MODE')):
+            imported, _ = execute_bundle(bundle, 1, import_only=True)
+            load_block(imported, 1, backend.config)
+        checks.append({'name':'native_mat_offline_import','passed':True,
+                       'scope':'MAT written by installed MODE; synthetic optical fixture'})
         session.eval('function vlac_block1_inspection(cfg,endpoint) { result=struct; result.ok=0; return result; }')
         session.eval('eval(vlac_smoke_entry);')
         value = session.getv('block1_native')
-        if bool(scalar(value['ok'])) or (bundle/'block1.lms').exists():
-            raise AssertionError('Failed native inspection left a successful result or stale LMS')
+        if bool(scalar(value['ok'])) or not (bundle/'block1.lms').is_file():
+            raise AssertionError('Failed native inspection was not marked incomplete with an empty saved project')
+        session.eval('load('+json.dumps((bundle/'block1.lms').as_posix())+'); vlac_empty_scene=getnamednumber("FDE");')
+        if scalar(session.getv('vlac_empty_scene')) != 0:
+            raise AssertionError('Incomplete LMS contains a stale solved FDE scene')
+        with patch.object(NativeLumapiBackend, '_import_lumapi', side_effect=AssertionError('Recovery import opened MODE')):
+            recovered, _ = execute_bundle(bundle, 1, import_only=True, last_successful=True)
+            load_block(recovered, 1, backend.config)
         checks.append({'name': 'native_block1_entry_export_and_failed_rerun', 'passed': True,
                        'scope': 'Synthetic execution/serialization only; inspection solve deliberately stubbed'})
         seeded = prepare_bundle(backend.config, bundle/"seeded", profile_dir=bundle/"test_exports/block2")
@@ -203,20 +230,58 @@ def compare_sections(original, native):
             "python_seconds": seconds_before, "native_seconds": seconds_after}
 
 
+def native_cache_checks(config, output):
+    """Actual MODE data: cold solve, tracking reselection, then an offline disk hit."""
+    from unittest.mock import patch
+    cache_path = output/'cache_check.sqlite'
+    with NativeLumapiBackend(config, cache_path=cache_path) as backend:
+        cold = section(backend, config, 'cross')
+        before = backend.budget.solves
+        liquid = float(backend.bank.liquid_cross.index(1.3e-6))
+        geometry = make_geometry(config.geometry, w1_m=1.15e-6, h_rib_m=175e-9, h_gap_m=1e-6,
+                                 d_c2c_m=0., state='cross', liquid_index=liquid)
+        started = time.perf_counter()
+        warm, reference = backend.evaluate_coefficients(geometry, 1.3e-6, references=(cold[1],), previous_kappa=cold[0].kappa)
+        seconds = time.perf_counter()-started
+        comparison = compare_sections(cold, (warm, reference, seconds))
+        comparison['additional_warm_solves'] = backend.budget.solves-before
+        comparison['cold_solves'] = before
+        comparison['passed'] &= comparison['additional_warm_solves'] == 0
+    with patch.object(NativeLumapiBackend, '_import_lumapi', side_effect=AssertionError('Disk hit opened MODE')):
+        with NativeLumapiBackend(config, cache_path=cache_path) as backend:
+            started = time.perf_counter()
+            coefficients, _ = backend.evaluate_coefficients(geometry, 1.3e-6)
+            comparison['offline_disk_hit_seconds'] = time.perf_counter()-started
+            comparison['offline_disk_hit_passed'] = coefficients.kappa == cold[0].kappa
+    comparison['passed'] &= comparison['offline_disk_hit_passed']
+    return comparison
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--math-only", action="store_true")
+    parser.add_argument("--cache-only", action="store_true")
+    parser.add_argument("--max-solves", type=int, default=24)
+    parser.add_argument("--max-seconds", type=float, default=900)
     parser.add_argument("--config", default=str(ROOT / "config/default.json"))
     parser.add_argument("--out", default=str(ROOT / "diagnostics/native_mode"))
     args = parser.parse_args()
     output = Path(args.out).resolve(); output.mkdir(parents=True, exist_ok=True)
     config = load_config(args.config)
-    config = replace(config, solver=replace(config.solver, hide_gui=True))
+    config = replace(config, solver=replace(config.solver, hide_gui=True),
+                     execution=replace(config.execution, max_solves=args.max_solves, max_seconds=args.max_seconds))
     report = {"status": "failed", "started_utc": datetime.now(timezone.utc).isoformat(),
               "scope": "Numerical implementation parity; no mesh convergence or full-device performance claim",
               "configuration": config.as_dict()}
     started = time.perf_counter()
     try:
+        if args.cache_only:
+            report['cache_reuse'] = native_cache_checks(config, output)
+            report['status'] = 'passed' if report['cache_reuse']['passed'] else 'failed'
+            report['elapsed_seconds'] = time.perf_counter()-started
+            write_json(output/'comparison.json',report)
+            print('Cache check: '+report['status'],flush=True)
+            return 0 if report['status']=='passed' else 1
         original = {}
         if not args.math_only:
             print("Running original v23 cross-sections (cross and bar)", flush=True)
@@ -228,7 +293,7 @@ def main():
         print("Loading native LSF library", flush=True)
         with NativeLumapiBackend(config) as backend:
             report["math"] = math_checks(backend)
-            report["native_block_smoke"] = native_block_smoke(backend)
+            report["native_block_smoke"] = native_block_smoke(backend, output)
             if not args.math_only:
                 report["sections"] = {}
                 for state in ("cross", "bar"):

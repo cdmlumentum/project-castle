@@ -15,6 +15,7 @@ from .materials import build_material_bank
 from .optimize import optimize_profiles, _axis_validation_errors, _grid_refine
 from .profiles import evaluate_design_profiles
 from .propagate import propagate_state
+from .runtime import resolved_cache, checkpoint_directory, output_attempt, overall_status
 
 
 def invalidate(output, first_block):
@@ -26,6 +27,8 @@ def invalidate(output, first_block):
     for name in ('performance_by_launch.csv','performance_summary.csv','wavelength_performance.png','metadata.json'):
         (out/name).unlink(missing_ok=True)
     if first_block<=3:
+        for name in ('characterization_coefficients.csv','characterization_summary.json'):
+            (out/name).unlink(missing_ok=True)
         for name in ('bar_coefficients.csv','coefficients.csv','profiles_and_coefficients.png'):
             (out/name).unlink(missing_ok=True)
     if first_block<=2:
@@ -66,6 +69,7 @@ def export_endpoint(output,config,endpoint,*,backend_name,source=None,backend=No
                'endpoint_constraint_verification':constraints,'converged':endpoint.converged}
     summary['diagnostics'] = report['diagnostics']
     write_json(out/'endpoint_summary.json',summary)
+    report['overall_status'] = overall_status(report)
     write_json(out/'block1_summary.json',report)
     return write_artifact(out,1,config,endpoint,validation=report,source=dict(source or {},backend_name=backend_name))
 
@@ -91,7 +95,9 @@ def profile_report(solution,endpoint,config):
 
 
 def run_profile(backend,config,bank,endpoint,output,*,progress=None,source=None):
-    solution = optimize_profiles(backend,config,bank,endpoint,progress=progress)
+    from .solver import LumapiBackend
+    solution = optimize_profiles(backend,config,bank,endpoint,progress=progress,
+        checkpoint_dir=checkpoint_directory(config) if isinstance(backend, LumapiBackend) else None)
     report = profile_report(solution,endpoint,config)
     report['upstream_validation'] = (source or {}).get('validation',{})
     from .block0 import require_design_verification
@@ -100,6 +106,7 @@ def run_profile(backend,config,bank,endpoint,output,*,progress=None,source=None)
         report['block0_verification'] = calibration_check
     export_profiles(output,config,endpoint,solution)
     write_json(Path(output)/'configuration.json',config.as_dict())
+    report['overall_status'] = overall_status(report)
     write_json(Path(output)/'block2_summary.json',report)
     artifact = write_artifact(output,2,config,endpoint,solution=solution,validation=report,source=source)
     if progress: progress.checkpoint('cross_state_optimization',report)
@@ -135,7 +142,13 @@ def run_bar(backend,config,bank,endpoint,solution,output,*,progress=None,source=
     bar = evaluate_design_profiles(backend,config,bank,endpoint,solution.w1_control_m,solution.d_c2c_control_m,
                                   solution.z_m,solution.wavelengths_m,state='bar',progress=progress)
     quality = validate_grid(bar,solution,config)
-    checked = check_bar_grid(backend,config,bank,endpoint,solution,bar,progress=progress)
+    characterization = None
+    if config.characterization.enabled:
+        from .characterize import characterize_profile
+        characterization = characterize_profile(backend, config, bank, endpoint, solution, progress=progress)
+        checked = dict(characterization['validation'], passed=characterization['validation']['status']=='passed')
+    else:
+        checked = check_bar_grid(backend,config,bank,endpoint,solution,bar,progress=progress)
     from .block0 import require_design_verification
     calibration_check = require_design_verification(config, output, endpoint, solution, backend=backend, bar=bar)
     report = {'block':3,'status':'passed' if quality['passed'] and checked['passed'] else 'review',
@@ -145,14 +158,38 @@ def run_bar(backend,config,bank,endpoint,solution,output,*,progress=None,source=
     if calibration_check is not None:
         report['block0_verification'] = calibration_check
     export_profiles(output,config,endpoint,solution,bar)
+    if characterization is not None:
+        from .block_io import decode_coefficients
+        from .profiles import target_profiles
+        from .export import _coefficient_rows, _write_csv
+        zz, ww = np.asarray(characterization['z_m']), np.asarray(characterization['wavelengths_m'])
+        targets = target_profiles(zz,config.device.length_m,endpoint.delta_beta_max_rad_per_m)
+        dense = replace(solution,z_m=zz,wavelengths_m=ww,cross_coefficients=decode_coefficients(characterization['cross']),
+                        delta_target_rad_per_m=targets[0],kappa_target_rad_per_m=targets[1])
+        rows = _coefficient_rows(dense,decode_coefficients(characterization['bar']),endpoint,config)
+        _write_csv(Path(output)/'characterization_coefficients.csv',list(rows[0]),rows)
+        write_json(Path(output)/'characterization_summary.json',characterization['validation'])
     write_json(Path(output)/'configuration.json',config.as_dict())
+    report['overall_status'] = overall_status(report)
     write_json(Path(output)/'block3_summary.json',report)
-    artifact = write_artifact(output,3,config,endpoint,solution=solution,bar=bar,validation=report,source=source)
+    artifact = write_artifact(output,3,config,endpoint,solution=solution,bar=bar,validation=report,source=source,characterization=characterization)
     if progress: progress.checkpoint('bar_state_coefficients',report)
     return bar,artifact
 
 
-def run_propagation(config,bank,endpoint,solution,bar,output,*,progress=None,source=None,backend_name='saved_fde_coefficients'):
+def run_propagation(config,bank,endpoint,solution,bar,output,*,progress=None,source=None,backend_name='saved_fde_coefficients',characterization=None):
+    saved_solution, saved_bar = solution, bar
+    if characterization is not None:
+        from .characterize import validate_characterization
+        from .block_io import decode_coefficients
+        from .profiles import target_profiles
+        validate_characterization(characterization, config, endpoint, solution)
+        z, wavelengths = np.asarray(characterization['z_m']), np.asarray(characterization['wavelengths_m'])
+        targets = target_profiles(z, config.device.length_m, endpoint.delta_beta_max_rad_per_m)
+        solution = replace(solution, z_m=z, wavelengths_m=wavelengths,
+            delta_target_rad_per_m=targets[0], kappa_target_rad_per_m=targets[1],
+            cross_coefficients=decode_coefficients(characterization['cross']))
+        bar = decode_coefficients(characterization['bar'])
     performance = []
     for state,grid in (('cross',solution.cross_coefficients),('bar',bar)):
         performance.extend(propagate_state(solution.z_m,grid,solution.wavelengths_m,state=state,
@@ -170,8 +207,14 @@ def run_propagation(config,bank,endpoint,solution,bar,output,*,progress=None,sou
               'full_device_validation':False}
     if progress: progress.start_stage('Export',total=1,unit='output bundles')
     export_run(output,config,bank,endpoint,solution,bar,performance,backend_name=backend_name,fde_run_completed=True)
+    report['overall_status'] = overall_status(report)
     write_json(Path(output)/'block4_summary.json',report)
-    artifact = write_artifact(output,4,config,endpoint,solution=solution,bar=bar,performance=performance,validation=report,source=source)
+    artifact = write_artifact(output,4,config,endpoint,solution=saved_solution,bar=saved_bar,performance=performance,validation=report,source=source,characterization=characterization)
+    metadata_path = Path(output)/'metadata.json'
+    metadata = json.loads(metadata_path.read_text())
+    metadata['block_validation'] = artifact['validation']
+    metadata['characterization_id'] = characterization.get('sha256') if characterization else None
+    write_json(metadata_path, metadata)
     if progress:
         progress.update(1,detail=str(output))
         progress.finish_stage()
@@ -179,7 +222,7 @@ def run_propagation(config,bank,endpoint,solution,bar,output,*,progress=None,sou
     return artifact
 
 
-def run_single_block(block,config,output,source_dir,*,backend_factory,progress,validation_only=False):
+def _run_single_block(block,config,output,source_dir,*,backend_factory,progress,validation_only=False):
     """Run only this block; all input validation precedes a MODE launch."""
     out = Path(output)
     out.mkdir(parents=True,exist_ok=True)
@@ -187,16 +230,18 @@ def run_single_block(block,config,output,source_dir,*,backend_factory,progress,v
     endpoint,solution,bar,source = load_block(source_dir,block-1,config)
     write_json(out/'configuration.json',config.as_dict())
     bank = build_material_bank(config)
+    characterization = source.get('payload',{}).get('characterization')
     source = source_record(source)
     progress.checkpoint('loaded_upstream_block',source)
     if source.get('validation',{}).get('status')=='review':
         progress.note('Loaded upstream result needs validation review; its status is retained in this block report.',force=True)
+    mode_launched = False
     if block==4:
         artifact = run_propagation(config,bank,endpoint,solution,bar,out,progress=progress,source=source,
-                                   backend_name=source.get('backend_name','saved_fde_coefficients'))
+                                   backend_name=source.get('backend_name','saved_fde_coefficients'),characterization=characterization)
     else:
         progress.start_stage('MODE API/license preflight',total=1,unit='startup checks')
-        with backend_factory(config,cache_path=config.resolved_path(config.output.cache_sqlite),progress=progress) as backend:
+        with backend_factory(config,cache_path=resolved_cache(config),progress=progress) as backend:
             backend.preflight(.5*(config.device.wavelength_min_m+config.device.wavelength_max_m))
             progress.update(1)
             progress.finish_stage()
@@ -205,12 +250,23 @@ def run_single_block(block,config,output,source_dir,*,backend_factory,progress,v
                 _,artifact = run_profile(backend,config,bank,endpoint,out,progress=progress,source=source)
             else:
                 _,artifact = run_bar(backend,config,bank,endpoint,solution,out,progress=progress,source=source)
+            mode_launched = getattr(backend, "_session", None) is not None
     report = artifact['validation']
     metadata_path = out/'metadata.json'
     metadata = json.loads(metadata_path.read_text(encoding='utf-8')) if metadata_path.exists() else {}
-    metadata.update(command=progress.command,blocks_executed_this_command=[block],mode_launched_this_command=block in (2,3),
+    metadata.update(command=progress.command,blocks_executed_this_command=[block],mode_launched_this_command=mode_launched,
                     loaded_upstream=source,block_validation=report,config=config.as_dict())
     write_json(metadata_path,metadata)
     if validation_only: write_json(out/f'block{block}_validation_report.json',report)
     progress.finish()
     return artifact
+
+
+def run_single_block(block, config, output, source_dir, *, backend_factory, progress, validation_only=False):
+    # Validate before touching published artifacts or acquiring a license.
+    load_block(source_dir, block-1, config)
+    from .progress import ProgressReporter
+    with output_attempt(output, progress.command) as attempt:
+        attempt_progress = ProgressReporter(progress.command, attempt, context={'block': block})
+        return _run_single_block(block, config, attempt, source_dir, backend_factory=backend_factory,
+                                 progress=attempt_progress, validation_only=validation_only)

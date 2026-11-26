@@ -313,8 +313,8 @@ class BlockZeroTests(unittest.TestCase):
     def test_selected_design_gate_stops_failed_or_incomplete_results(self):
         config = b0.apply_certificate(self.config, certificate_fixture(self.config))
         for status in ('failed', 'incomplete'):
-            with patch.object(b0, 'verify_design', return_value={'status': status}), self.assertRaisesRegex(ValueError, status):
-                b0.require_design_verification(config, self.out, None)
+            with patch.object(b0, 'verify_design', return_value={'status': status}), self.assertRaisesRegex(b0.BudgetExceeded if status=='incomplete' else ValueError, status):
+                b0.require_design_verification(config, self.out, config.geometry)
 
     def test_cli_uses_budget_and_trial_options_without_mode(self):
         with patch.object(b0, 'run_calibration', return_value={'status': 'incomplete'}) as run:

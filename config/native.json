@@ -131,28 +131,58 @@
   "output": {
     "directory": "outputs/native_run",
     "cache_sqlite": "outputs/cache/native_fde_cache.sqlite",
-    "save_solver_projects": false
+    "save_solver_projects": false,
+    "cache_max_bytes": 2000000000
   },
   "convergence": {
     "max_solves": 1200,
     "max_seconds": 21600,
-    "reference_domain_factors": [1.0, 1.25, 1.5, 1.75],
-    "reference_mesh_factors": [1.0, 0.75, 0.5, 0.375],
-    "candidate_margin_factors": [1.0, 0.75, 0.5],
-    "candidate_mesh_factors": [1.0, 1.25, 1.5],
-    "neff_atol": 0.00002,
+    "reference_domain_factors": [
+      1.0,
+      1.25,
+      1.5,
+      1.75
+    ],
+    "reference_mesh_factors": [
+      1.0,
+      0.75,
+      0.5,
+      0.375
+    ],
+    "candidate_margin_factors": [
+      1.0,
+      0.75,
+      0.5
+    ],
+    "candidate_mesh_factors": [
+      1.0,
+      1.25,
+      1.5
+    ],
+    "neff_atol": 2e-05,
     "coefficient_rtol": 0.01,
     "coefficient_atol_rad_per_m": 2.0,
     "phase_error_rad": 0.02,
     "loss_error_db": 0.01,
     "minimum_power_overlap": 0.999,
     "polarization_atol": 0.01,
-    "comparison_dx_m": 6e-8,
-    "comparison_dy_m": 3e-8,
-    "local_mesh_padding_m": 4e-7,
+    "comparison_dx_m": 6e-08,
+    "comparison_dy_m": 3e-08,
+    "local_mesh_padding_m": 4e-07,
     "pml_layers": 12,
     "pml_test_extra_layers": 4,
     "timing_repeats": 2,
     "reference_sentinels": 4
+  },
+  "execution": {
+    "max_solves": 12000,
+    "max_seconds": 14400,
+    "resume": true,
+    "native_batch_size": 4,
+    "reuse_verification": true
+  },
+  "characterization": {
+    "enabled": true,
+    "max_refinements": 4
   }
 }

@@ -196,7 +196,7 @@ def _surrogate_pairs(samples, evaluator, config):
     return ranked
 
 
-def search_endpoints_adaptive(backend, config, bank, *, progress=None, output_dir=None, validation_only=False):
+def search_endpoints_adaptive(backend, config, bank, *, progress=None, output_dir=None, validation_only=False, checkpoint_dir=None):
     """Optimize a constrained pair from shared width solves; freshly verify it."""
     config.validate()
     g, settings = config.geometry, config.endpoint_search
@@ -219,16 +219,32 @@ def search_endpoints_adaptive(backend, config, bank, *, progress=None, output_di
         (out/name).write_text("",encoding="utf-8")
     _write_json(out/"endpoint_adaptive_history.json",{"refinements": []})
     evaluator = WidthEvaluator(backend,config,bank,progress=progress)
+    from .checkpoints import Checkpoint
+    from .provenance import checkpoint_identity
+    from .runtime import checkpoint_directory
+    from dataclasses import asdict
+    policies = asdict(settings); policies.pop('adaptive_max_widths')
+    from .solver import LumapiBackend
+    directory = checkpoint_dir or (checkpoint_directory(config) if isinstance(backend, LumapiBackend) else None)
+    checkpoint = Checkpoint(directory, 'adaptive-widths',
+                            checkpoint_identity(config, 1, dict(policies, backend=getattr(backend, "backend_name", type(backend).__qualname__)))) if directory is not None else None
+    saved = checkpoint.load() if checkpoint and config.execution.resume else None
+    if saved:
+        evaluator.snapshots = saved['snapshots']
+        evaluator.lower_modes = saved['lower_modes']
     if progress:
         progress.start_stage("Precompute state-independent lower-guide modes",total=2,unit="band-edge modes")
-    evaluator.precompute_lower()
+    if not evaluator.lower_modes: evaluator.precompute_lower()
     if progress:
         progress.finish_stage()
         progress.start_stage("Endpoint detuning search",total=settings.adaptive_max_widths,unit="distinct widths")
-    samples, history = {}, []
+    samples, history = (saved["samples"], saved["history"]) if saved else ({}, [])
     tolerance = settings.adaptive_width_tolerance_m
 
     def save():
+        if checkpoint:
+            checkpoint.save({'samples': samples, 'history': history,
+                             'snapshots': evaluator.snapshots, 'lower_modes': evaluator.lower_modes})
         records, summaries = [], []
         for width,sample in sorted(samples.items()):
             summaries.append({"w1_m": width,"valid": sample["valid"],"eligible_end": sample["eligible_end"],

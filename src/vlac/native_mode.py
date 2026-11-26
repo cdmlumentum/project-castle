@@ -116,9 +116,12 @@ def prepare_bundle(config, output, *, endpoint_dir=None, profile_dir=None, width
         if number > 1:
             lines.append(f'matlabload("block{number-1}_native.mat");')
         arguments = "vlac_cfg" + (f",block{number-1}_native" if number > 1 else "")
-        if number == 1:
-            lines += ['if (fileexists("block1.lms")) { rm("block1.lms"); }',
-                      'if (fileexists("block1_native.mat")) { rm("block1_native.mat"); }']
+        # Safe-mode-compatible invalidation: an interrupted run cannot import old success.
+        lines += [f'{result_name}=struct; {result_name}.ok=0;',
+                  f'{result_name}.error="incomplete_native_attempt";',
+                  f'{result_name}.bundle_id=vlac_cfg.bundle_id;',
+                  f'matlabsave("{result_name}.mat",{result_name});',
+                  f'save("block{number}.lms");']
         lines += [f"{result_name}=vlac_block{number}({arguments});",
                   f"{result_name}.bundle_id=vlac_cfg.bundle_id;"]
         if number == 1:
@@ -127,7 +130,8 @@ def prepare_bundle(config, output, *, endpoint_dir=None, profile_dir=None, width
                       f'if (!vlac_inspection.ok) {{ {result_name}.ok=0; {result_name}.error="inspection_solve_failed"; }}',
                       f'else {{ {result_name}.inspection_kind="full_two_guide_input_cross_min_wavelength_v1"; }}',
                       '}']
-        lines += [f'if ({result_name}.ok) {{ save("block{number}.lms"); }}',
+        lines += [f'if ({result_name}.ok) {{ save("block{number}.lms"); save("block{number}_last_successful.lms");',
+                  f'matlabsave("block{number}_last_successful_native.mat",{result_name}); }}',
                   f'matlabsave("{result_name}.mat",{result_name});', f"?{result_name}.ok;"]
         (output / f"block{number}.lsf").write_text("\n".join(lines)+"\n", encoding="utf-8")
     if upstream is not None:
@@ -222,7 +226,22 @@ def export_result(value, block, config, output, *, inspection_project=None):
     return write_artifact(output, 3, config, endpoint, solution=solution, bar=bar, validation=report, source=source)
 
 
-def execute_bundle(bundle, block, *, import_only=False):
+def normalize_mat_cells(value):
+    """Normalize MATLAB cell vectors while retaining numeric field array shapes."""
+    if isinstance(value, dict):
+        result = {key: normalize_mat_cells(item) for key,item in value.items()}
+        for key in ('items', 'rows', 'grid_history'):
+            if key in result and isinstance(result[key], dict): result[key] = [result[key]]
+        return result
+    if isinstance(value, np.ndarray) and value.dtype == object:
+        return [normalize_mat_cells(item) for item in value.flat]
+    if isinstance(value, list): return [normalize_mat_cells(item) for item in value]
+    return value
+
+
+def _execute_bundle(bundle, block, *, import_only=False, output=None, last_successful=False):
+    if last_successful and not import_only: raise ValueError('last_successful is an import option')
+    suffix = '_last_successful' if last_successful else ''
     bundle = Path(bundle).resolve()
     manifest = json.loads((bundle/"manifest.json").read_text(encoding="utf-8"))
     for name, checksum in manifest["files"].items():
@@ -230,23 +249,34 @@ def execute_bundle(bundle, block, *, import_only=False):
             raise ValueError("Bundle input changed: " + name + ". Prepare a new bundle for changed inputs.")
     config = load_config(bundle/"configuration.json")
     config = replace(config, solver=replace(config.solver, hide_gui=True))
-    output = bundle / "python" / f"block{block}"
+    output = Path(output) if output is not None else bundle / "python" / f"block{block}"
     output.mkdir(parents=True, exist_ok=True)
     blocks.invalidate(output, block)
     try:
-        with NativeLumapiBackend(config) as backend:
-            if import_only:
-                backend.session.eval("matlabload("+json.dumps((bundle/f"block{block}_native.mat").as_posix())+");")
-            else:
+        if import_only:
+            from .mat_io import load_mat
+            packet = load_mat(bundle/f"block{block}{suffix}_native.mat")
+            value = packet[f"block{block}_native"]
+            value = normalize_mat_cells(value)
+        else:
+            with NativeLumapiBackend(config) as backend:
                 backend.session.eval((bundle/f"block{block}.lsf").read_text(encoding="utf-8"))
-            value = backend.session.getv(f"block{block}_native")
+                value = backend.session.getv(f"block{block}_native")
         if value.get("bundle_id") != manifest["bundle_id"]:
             raise ValueError("Native result belongs to a different bundle")
-        artifact = export_result(value, block, config, output, inspection_project=bundle/"block1.lms" if block == 1 else None)
-        return output, artifact["validation"]["status"]
+        artifact = export_result(value, block, config, output, inspection_project=bundle/f"block1{suffix}.lms" if block == 1 else None)
+        return output, artifact["validation"]["overall_status"]
     except Exception as exc:
         write_json(output/f"block{block}_failure.json", {"status": "failed", "error": str(exc)})
         raise
+
+
+def execute_bundle(bundle, block, *, import_only=False, last_successful=False):
+    from .runtime import output_attempt
+    output = Path(bundle).resolve()/'python'/f'block{block}'
+    with output_attempt(output, 'native import' if import_only else 'native run') as attempt:
+        _, status = _execute_bundle(bundle, block, import_only=import_only, output=attempt, last_successful=last_successful)
+    return output, status
 
 
 def main(argv=None):
@@ -260,6 +290,7 @@ def main(argv=None):
     source.add_argument("--endpoint-dir"); source.add_argument("--profile-dir")
     for name in ("run", "import"):
         command = commands.add_parser(name, help="run a native block or import a result created in MODE")
+        if name == "import": command.add_argument("--last-successful", action="store_true", help="Import preserved success after a later failed standalone attempt")
         command.add_argument("--bundle", required=True); command.add_argument("--block", type=int, choices=(1, 2, 3), required=True)
     args = parser.parse_args(argv)
     try:
@@ -271,7 +302,7 @@ def main(argv=None):
             print(prepare_bundle(config, args.out, endpoint_dir=args.endpoint_dir,
                                  profile_dir=args.profile_dir, width_samples=args.width_samples))
             return 0
-        output, status = execute_bundle(args.bundle, args.block, import_only=args.command == "import")
+        output, status = execute_bundle(args.bundle, args.block, import_only=args.command == "import", last_successful=getattr(args,"last_successful",False))
         print(str(output) + ": " + status)
         return 0 if status == "passed" else 3
     except Exception as exc:

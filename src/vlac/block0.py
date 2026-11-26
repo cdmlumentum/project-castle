@@ -33,8 +33,7 @@ METHOD = 'mode_domain_mesh_calibration_v1'
 KINDS = ('isolated', 'coupled')
 
 
-class BudgetExceeded(RuntimeError):
-    pass
+from .runtime import BudgetExceeded
 
 
 @lru_cache(maxsize=64)
@@ -288,8 +287,7 @@ class NativeEvaluator:
         if self.backend is None:
             self.backend = NativeLumapiBackend(self.config)
         try:
-            if not self.owns_backend:
-                load_native_functions(self.backend.session, 'vlac_core.lsf')
+            load_native_functions(self.backend.session, 'vlac_core.lsf')
             load_native_functions(self.backend.session, 'vlac_convergence.lsf')
             self.functions_loaded = True
         except Exception:
@@ -301,6 +299,7 @@ class NativeEvaluator:
             self.backend.close()
         elif self.backend is not None:
             # Native geometry operations invalidate a Python adapter's layout.
+            self.backend._uploaded_config = None
             self.backend._project_ready = False
             self.backend._installed_material_names = set()
 
@@ -319,12 +318,18 @@ class NativeEvaluator:
         cfg['comparison_enabled'] = 1.
         cfg['comparison_x_m'], cfg['comparison_y_m'] = column(x), column(y)
         session = self.backend.session
+        signature = digest(cfg)
+        if getattr(self, '_scene_signature', None) != signature:
+            session.eval('newproject;')
+            self._scene_signature = signature
+        self.backend._budget().check((2 if kind=='isolated' else 3)*(1+self.config.solver.zero_mode_retries))
         session.putv('vlac_cfg', cfg)
         session.putv('vlac_request', {'geometry': asdict(geometry), 'wavelength_m': case['wavelength_m'], 'kind': kind})
         started = time.perf_counter()
         session.eval('vlac_sample=vlac_convergence_sample(vlac_cfg,vlac_request);')
         value = session.getv('vlac_sample')
         elapsed = time.perf_counter()-started
+        self.backend._budget().consume(int(scalar(value.get('solves', 0))))
         if not bool(scalar(value['ok'])):
             raise RuntimeError('Block 0 MODE sample failed: '+value.get('error', 'unknown'))
         modes = list(value['modes'])
@@ -754,7 +759,7 @@ def verify_saved_design(config, output, *, endpoint_dir=None, profile_dir=None, 
     return verify_design(config, output, endpoint, solution, evaluator_factory=evaluator_factory)
 
 
-def verify_design(config, output, endpoint, solution=None, *, bar=None, evaluator_factory=NativeEvaluator):
+def verify_design(config, output, endpoint, solution=None, *, bar=None, evaluator_factory=NativeEvaluator, resume=False):
     """Bounded fresh validation; this never creates another calibration certificate."""
     certificate = config.solver.calibration
     if certificate is None:
@@ -774,7 +779,7 @@ def verify_design(config, output, endpoint, solution=None, *, bar=None, evaluato
     evaluator = evaluator_factory(config)
     run = None
     try:
-        run = CalibrationRun(config, output, evaluator, trial=False)
+        run = CalibrationRun(config, output, evaluator, trial=False, resume=resume)
         passed = True
         for kind in (('isolated',) if solution is None else KINDS):
             cases = [dict(w1_m=float(width), d_c2c_m=float(offset), wavelength_m=float(wavelength),
@@ -825,9 +830,21 @@ def verify_design(config, output, endpoint, solution=None, *, bar=None, evaluato
 def require_design_verification(config, output, endpoint, solution=None, *, backend=None, bar=None):
     if config.solver.calibration is None:
         return None
-    directory = Path(output)/'block0_checks'/uuid.uuid4().hex[:12]
+    from .provenance import checkpoint_identity
+    from .runtime import checkpoint_directory
+    from .block_io import geometry_data, endpoint_data
+    design = geometry_data(config, endpoint, solution) if solution is not None else endpoint_data(endpoint)
+    coordinates = {'z': solution.z_m, 'wavelengths': solution.wavelengths_m} if solution is not None else None
+    criteria = {k:v for k,v in config.as_dict()['convergence'].items() if k not in {'max_solves','max_seconds','timing_repeats'}}
+    key = checkpoint_identity(config, 2, {'design': design, 'coordinates': coordinates,
+                                       'verification': criteria, 'verification_code': implementation_identity()})
+    directory = (checkpoint_directory(config)/'verification'/key if config.execution.reuse_verification
+                 else Path(output)/'block0_checks'/uuid.uuid4().hex[:12])
     report = verify_design(config, directory, endpoint, solution, bar=bar,
-                           evaluator_factory=lambda cfg: NativeEvaluator(cfg, backend=backend))
+                           evaluator_factory=lambda cfg: NativeEvaluator(cfg, backend=backend),
+                           resume=(directory/"checkpoint.json").exists())
+    if report['status'] == 'incomplete':
+        raise BudgetExceeded(f'Block 0 selected-design verification incomplete; resume evidence in {directory}.')
     if report['status'] != 'passed':
         raise ValueError(f'Block 0 selected-design verification {report["status"]}; see {directory}. Review mode selection and recalibrate before publishing this design.')
     return {'status': 'passed', 'certificate_id': config.solver.calibration['certificate_id'],

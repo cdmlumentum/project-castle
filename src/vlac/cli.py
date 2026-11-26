@@ -31,6 +31,7 @@ from .validation import (
 from .python_pso import search_endpoints_python_pso
 from .adaptive_endpoint import search_endpoints_adaptive
 
+from .runtime import output_attempt, resolved_cache, BudgetExceeded, RunBudget
 from . import blocks
 from .block_io import load_block, source_record, write_artifact, write_json
 
@@ -87,7 +88,7 @@ def _run_stage_plan(config) -> list[str]:
 
 def _write_failure_report(path: Path, command: str, exc: Exception, progress) -> None:
     payload = {
-        "status": "failed",
+        "status": "incomplete" if isinstance(exc, BudgetExceeded) else "failed",
         "command": command,
         "failed_stage": progress.stage_name,
         "error_type": type(exc).__name__,
@@ -101,7 +102,7 @@ def _write_failure_report(path: Path, command: str, exc: Exception, progress) ->
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
-def run_workflow(
+def _run_workflow(
     config_path: str | Path,
     out_path: str | Path | None = None,
     *,
@@ -113,20 +114,26 @@ def run_workflow(
     profile_dir: str | Path | None = None,
     bar_dir: str | Path | None = None,
     block0_dir: str | Path | None = None,
+    execution=None, characterize=False,
 ) -> Path:
     config = _apply_runtime_overrides(load_config(config_path),api_path=api_path,hide_gui=hide_gui,platform=platform,block0_dir=block0_dir)
     if endpoint_method is not None:
         config = replace(config,endpoint_search=replace(config.endpoint_search,method=endpoint_method))
+    config = _execution_overrides(config, execution, characterize)
     config.validate()
     sources = [(2,endpoint_dir),(3,profile_dir),(4,bar_dir)]
     selected = [(block,path) for block,path in sources if path is not None]
     if len(selected)>1: raise ValueError('Choose only one of endpoint_dir, profile_dir or bar_dir.')
+    if not selected and config.execution.resume:
+        from .runtime import resume_source
+        reusable = resume_source(config, _output_path(config, str(out_path) if out_path else None))
+        if reusable: selected = [reusable]
     first,source_path = selected[0] if selected else (1,None)
     endpoint,solution,bar,artifact = load_block(source_path,first-1,config) if selected else (None,None,None,None)
     output = _output_path(config,str(out_path) if out_path else None)
     output.mkdir(parents=True,exist_ok=True)
     blocks.invalidate(output,first)
-    cache_path = config.resolved_path(config.output.cache_sqlite)
+    cache_path = resolved_cache(config)
     progress = ProgressReporter('vlac run',output,context={'config_path':str(Path(config_path).resolve()),
         'first_block':first,'loaded_from':str(source_path) if source_path else None})
     plan = _run_stage_plan(config)
@@ -140,15 +147,15 @@ def run_workflow(
         if artifact is not None:
             # Copy the loaded stage as a portable checkpoint before computing
             # anything downstream; legacy endpoint exports are normalized here.
-            if first==2:
-                artifact = blocks.export_endpoint(output,config,endpoint,backend_name=source_record(artifact)['backend_name'],source=source_record(artifact))
-            else:
-                artifact = write_artifact(output,first-1,config,endpoint,solution=solution,bar=bar,
-                                          validation=artifact.get('validation'),source=source_record(artifact))
+            artifact = write_artifact(output,first-1,config,endpoint,solution=solution,bar=bar,
+                validation=artifact.get('validation'),source=source_record(artifact),
+                characterization=artifact.get('payload',{}).get('characterization'))
             progress.checkpoint('loaded_upstream_block',source_record(artifact))
+        budget = RunBudget(config.execution)
         manager = _backend(config,cache_path=cache_path,progress=progress) if first<=3 else nullcontext(None)
         with manager as backend:
             if backend is not None:
+                backend.budget = budget
                 progress.start_stage('MODE API/license preflight',total=1,unit='startup checks')
                 backend.preflight(.5*(config.device.wavelength_min_m+config.device.wavelength_max_m))
                 progress.update(1)
@@ -163,9 +170,9 @@ def run_workflow(
                 bar,artifact = blocks.run_bar(backend,config,bank,endpoint,solution,output,progress=progress,source=source_record(artifact))
         backend_name = source_record(artifact)['backend_name']
         blocks.run_propagation(config,bank,endpoint,solution,bar,output,progress=progress,
-                               source=source_record(artifact),backend_name=backend_name)
+                               source=source_record(artifact),backend_name=backend_name,characterization=artifact.get('payload',{}).get('characterization'))
         if config.materials.sin_index_sensitivity_offsets:
-            _run_index_sensitivity(config,endpoint,solution,output,cache_path,progress=progress)
+            _run_index_sensitivity(config,endpoint,solution,output,cache_path,progress=progress,budget=budget)
         progress.finish()
         return output
     except Exception as exc:
@@ -174,7 +181,7 @@ def run_workflow(
         raise
 
 
-def run_endpoint_only(
+def _run_endpoint_only(
     config_path: str | Path,
     out_path: str | Path | None = None,
     *,
@@ -183,6 +190,7 @@ def run_endpoint_only(
     platform: str | None = None,
     endpoint_method: str | None = None,
     block0_dir: str | Path | None = None,
+    execution=None, characterize=False,
 ) -> Path:
     """Run the configured Python endpoint search and export block 1."""
     import csv
@@ -192,13 +200,14 @@ def run_endpoint_only(
     )
     if endpoint_method is not None:
         config = replace(config, endpoint_search=replace(config.endpoint_search, method=endpoint_method))
+    config = _execution_overrides(config, execution, characterize)
     config.validate()
     output = Path(out_path) if out_path else config.project_root / "outputs" / "endpoint"
     blocks.invalidate(output,1)
     if not output.is_absolute():
         output = (config.project_root / output).resolve()
     output.mkdir(parents=True, exist_ok=True)
-    cache_path = config.resolved_path(config.output.cache_sqlite)
+    cache_path = resolved_cache(config)
     progress = ProgressReporter(
         "vlac endpoint", output,
         context={"config_path": str(Path(config_path).resolve()), "api_path": config.solver.api_path,
@@ -308,7 +317,7 @@ def _endpoint_detuning_summary(records: list[dict]) -> dict:
     return result
 
 
-def _run_index_sensitivity(config, endpoint, solution, output, cache_path, *, progress=None):
+def _run_index_sensitivity(config, endpoint, solution, output, cache_path, *, progress=None, budget=None):
     """Evaluate the fixed optimized layout for user-supplied absolute SiN dn offsets."""
     rows = []
     if progress:
@@ -327,6 +336,7 @@ def _run_index_sensitivity(config, endpoint, solution, output, cache_path, *, pr
         varied_config = replace(config, materials=varied_materials)
         varied_bank = build_material_bank(varied_config)
         with _backend(varied_config, cache_path=cache_path, progress=progress) as backend:
+            if budget is not None: backend.budget = budget
             for state in ("cross", "bar"):
                 if progress:
                     progress.note(f"evaluating dn={offset:+g} in {state} state", force=True)
@@ -374,7 +384,48 @@ def _run_index_sensitivity(config, endpoint, solution, output, cache_path, *, pr
         progress.finish_stage(f"saved {len(rows)} sensitivity rows")
 
 
+def _execution_args(args):
+    return {key: getattr(args, key, None) for key in ('max_solves', 'max_seconds', 'no_resume', 'cache_dir')}
+
+
+def _execution_overrides(config, execution=None, characterize=False):
+    settings = dict(execution or {})
+    cache_dir = settings.pop('cache_dir', None)
+    no_resume = settings.pop('no_resume', False)
+    updates = {k:v for k,v in settings.items() if v is not None}
+    if no_resume: updates['resume'] = False
+    config = replace(config, execution=replace(config.execution, **updates))
+    if cache_dir:
+        config = replace(config, output=replace(config.output, cache_sqlite=str(Path(cache_dir).resolve()/Path(config.output.cache_sqlite).name)))
+    if characterize:
+        config = replace(config, characterization=replace(config.characterization, enabled=True))
+    return config
+
+
+def run_workflow(config_path, out_path=None, **kwargs):
+    config = load_config(config_path)
+    output = _output_path(config, str(out_path) if out_path else None)
+    with output_attempt(output, 'vlac run') as attempt:
+        _run_workflow(config_path, attempt, **kwargs)
+    return output
+
+
+def run_endpoint_only(config_path, out_path=None, **kwargs):
+    config = load_config(config_path)
+    output = Path(out_path) if out_path else config.project_root/'outputs'/'endpoint'
+    if not output.is_absolute(): output = (config.project_root/output).resolve()
+    with output_attempt(output, 'vlac endpoint') as attempt:
+        _run_endpoint_only(config_path, attempt, **kwargs)
+    return output
+
+
 def _add_solver_runtime_args(parser: argparse.ArgumentParser) -> None:
+    if parser.prog.split()[-1] not in {'block0', 'verify-block0'}:
+        parser.add_argument('--max-solves', type=int)
+        parser.add_argument('--max-seconds', type=float)
+    parser.add_argument('--no-resume', action='store_true')
+    parser.add_argument('--cache-dir')
+    parser.add_argument('--characterize', action='store_true', help='Retain directly checked broadband cross/bar grids for the frozen profile.')
     parser.add_argument('--block0-dir', default=None, help='Passed Block 0 directory or certificate.json; validates and applies its solver profiles.')
     parser.add_argument(
         "--api-path",
@@ -392,7 +443,7 @@ def _add_solver_runtime_args(parser: argparse.ArgumentParser) -> None:
     parser.set_defaults(hide_gui=None)
 
 
-def main(argv: list[str] | None = None) -> int:
+def _main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="vlac")
     subparsers = parser.add_subparsers(dest="command", required=True)
     run = subparsers.add_parser("run", help="run endpoint search, optimize, propagate, export")
@@ -483,7 +534,61 @@ def main(argv: list[str] | None = None) -> int:
     source_zero.add_argument('--endpoint-dir')
     source_zero.add_argument('--profile-dir')
     _add_solver_runtime_args(verify_zero)
+    for name in ('inspect', 'report', 'plan', 'cache'):
+        operation = subparsers.add_parser(name, help='Offline '+name+'; MODE is not required')
+        operation.add_argument('--config', default=str(DEFAULT_CONFIG))
+        if name in ('inspect', 'report'):
+            operation.add_argument('--source-dir', required=True)
+            operation.add_argument('--block', type=int, choices=(1,2,3,4) if name=='inspect' else (2,3,4), required=True)
+        if name == 'report': operation.add_argument('--out', required=True)
+        if name == 'plan': operation.add_argument('--profile-dir')
+        if name == 'cache':
+            operation.add_argument('--max-bytes', type=int, help='Explicitly prune least recently used entries to this payload size.')
+            operation.add_argument('--vacuum', action='store_true', help='Reclaim unused SQLite disk pages after pruning.')
+    characterize = subparsers.add_parser('characterize', help='Retain directly checked broadband coefficients on frozen Block 2 geometry')
+    characterize.set_defaults(block_number=3, block_validation=False)
+    characterize.add_argument('--config', default=str(DEFAULT_CONFIG))
+    characterize.add_argument('--profile-dir', required=True)
+    characterize.add_argument('--out')
+    _add_solver_runtime_args(characterize)
+    characterize.set_defaults(characterize=True)
+    sensitivity = subparsers.add_parser('sensitivity', help='Evaluate process-supplied cases on frozen Block 2 controls')
+    sensitivity.add_argument('--config', default=str(DEFAULT_CONFIG))
+    sensitivity.add_argument('--profile-dir', required=True)
+    sensitivity.add_argument('--cases', required=True, help='JSON with process source and named SI perturbations')
+    sensitivity.add_argument('--out', required=True)
+    _add_solver_runtime_args(sensitivity)
     args = parser.parse_args(argv)
+    if args.command == 'sensitivity':
+        from .sensitivity import load_cases, run as run_sensitivity
+        try:
+            config = _apply_runtime_overrides(load_config(args.config), api_path=args.api_path, hide_gui=args.hide_gui,
+                                              platform=args.platform, block0_dir=args.block0_dir)
+            config = _execution_overrides(config, _execution_args(args))
+            result = run_sensitivity(config, args.profile_dir, load_cases(args.cases), args.out, _backend)
+            print(f"Sensitivity completed: {len(result['cases'])} cases; status {result['status']}; {args.out}")
+            return 0
+        except Exception as exc:
+            print(f'Sensitivity failed: {exc}', file=sys.stderr)
+            return 2
+    if args.command in {'inspect', 'report', 'plan', 'cache'}:
+        from . import operations
+        config = load_config(args.config)
+        try:
+            if args.command == 'inspect': result = operations.inspect(config, args.source_dir, args.block)
+            elif args.command == 'report': result = {'output': str(operations.report(config, args.source_dir, args.block, args.out))}
+            elif args.command == 'plan': result = operations.plan(config, args.profile_dir)
+            else:
+                from .cache import SQLiteCache
+                cache = SQLiteCache(resolved_cache(config))
+                if args.max_bytes is not None: cache.prune(args.max_bytes)
+                if args.vacuum: cache.vacuum()
+                result = cache.inspect()
+            print(json.dumps(result, indent=2))
+            return 0
+        except Exception as exc:
+            print(f'{args.command} failed: {exc}', file=sys.stderr)
+            return 2
     if args.command in {'block0', 'verify-block0'}:
         from .block0 import run_calibration, verify_saved_design
         try:
@@ -511,6 +616,7 @@ def main(argv: list[str] | None = None) -> int:
         progress = None
         try:
             config = _apply_runtime_overrides(load_config(args.config),api_path=args.api_path,hide_gui=args.hide_gui,platform=args.platform,block0_dir=args.block0_dir)
+            config = _execution_overrides(config, _execution_args(args), args.characterize)
             if number==2:
                 updates = {key:value for key,value in (("max_function_evaluations_per_grid",args.max_evaluations),
                                                       ("max_grid_refinements",args.max_refinements)) if value is not None}
@@ -525,7 +631,7 @@ def main(argv: list[str] | None = None) -> int:
             source = getattr(args,{2:"endpoint_dir",3:"profile_dir",4:"bar_dir"}[number])
             artifact = blocks.run_single_block(number,config,output,source,backend_factory=_backend,progress=progress,
                                                 validation_only=args.block_validation)
-            status = artifact["validation"]["status"]
+            status = artifact["validation"]["overall_status"]
             print(f"Block {number} completed; validation status: {status}; outputs: {output}")
             return 3 if args.block_validation and status!="passed" else 0
         except Exception as exc:
@@ -533,11 +639,11 @@ def main(argv: list[str] | None = None) -> int:
                 progress.fail(exc)
                 _write_failure_report(output/f"block{number}_failure.json","vlac "+args.command,exc,progress)
                 if args.block_validation:
-                    write_json(output/f"block{number}_validation_report.json",{"block":number,"status":"failed",
+                    write_json(output/f"block{number}_attempt_validation.json",{"block":number,"status":"incomplete" if isinstance(exc,BudgetExceeded) else "failed",
                         "execution_completed":False,"error_type":type(exc).__name__,"error":str(exc),
                         "failure_report":str(output/f"block{number}_failure.json")})
-            print(f"Block {number} failed: {exc}",file=sys.stderr)
-            return 2
+            print(f"Block {number} stopped: {exc}",file=sys.stderr)
+            return 3 if isinstance(exc,BudgetExceeded) else 2
 
 
     if args.command == "validate":
@@ -579,6 +685,7 @@ def main(argv: list[str] | None = None) -> int:
             platform=args.platform,
             block0_dir=args.block0_dir,
         )
+        config = _execution_overrides(config, _execution_args(args))
         out = Path(args.out) if args.out else _output_path(config) / "fde_validation_report.json"
         progress = ProgressReporter(
             "vlac validate-fde",
@@ -643,6 +750,7 @@ def main(argv: list[str] | None = None) -> int:
             platform=args.platform,
             block0_dir=args.block0_dir,
         )
+        config = _execution_overrides(config, _execution_args(args))
         adaptive = args.command == "validate-endpoint"
         config = replace(config, endpoint_search=replace(config.endpoint_search, method="adaptive_1d" if adaptive else "python_pso"))
         config.validate()
@@ -676,7 +784,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             with _backend(
                 config,
-                cache_path=config.resolved_path(config.output.cache_sqlite),
+                cache_path=resolved_cache(config),
                 progress=progress,
             ) as backend:
                 progress.start_stage("MODE API/license preflight", total=1, unit="startup checks")
@@ -732,13 +840,14 @@ def main(argv: list[str] | None = None) -> int:
                 platform=args.platform,
                 endpoint_method=args.endpoint_method,
                 block0_dir=args.block0_dir,
+                execution=_execution_args(args), characterize=args.characterize,
             )
         except LumapiUnavailable as exc:
             print(f"MODE/FDE endpoint block not started: {exc}", file=sys.stderr)
             return 2
         except Exception as exc:
-            print(f"Endpoint block failed: {exc}", file=sys.stderr)
-            return 2
+            print(f"Endpoint block stopped: {exc}", file=sys.stderr)
+            return 3 if isinstance(exc,BudgetExceeded) else 2
         print(f"Endpoint block 1 completed. Outputs: {output}")
         return 0
     if args.command == "compare-full-device":
@@ -759,13 +868,50 @@ def main(argv: list[str] | None = None) -> int:
                 profile_dir=args.profile_dir,
                 bar_dir=args.bar_dir,
                 block0_dir=args.block0_dir,
+                execution=_execution_args(args), characterize=args.characterize,
             )
         except Exception as exc:
-            print(f"MODE/FDE run not started: {exc}", file=sys.stderr)
-            return 2
+            print(f"MODE/FDE run stopped: {exc}", file=sys.stderr)
+            return 3 if isinstance(exc,BudgetExceeded) else 2
         print(f"MODE/FDE workflow completed. Outputs: {output}")
         return 0
     return 1
+
+
+def main(argv: list[str] | None = None) -> int:
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    validators = {'validate-block1', 'validate-endpoint', 'validate-pso', 'validate-fde'}
+    if not arguments or arguments[0] not in validators or any(v in arguments for v in ('--help','-h')):
+        return _main(arguments)
+    # Older validators accept a report filename; isolate their entire output directory too.
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument('command'); parser.add_argument('--config',default=str(DEFAULT_CONFIG)); parser.add_argument('--out')
+    options, _ = parser.parse_known_args(arguments)
+    config = load_config(options.config)
+    names = {'validate-endpoint':'endpoint_validation_report.json','validate-pso':'endpoint_pso_validation_report.json',
+             'validate-fde':'fde_validation_report.json'}
+    if options.command == 'validate-block1':
+        root = Path(options.out or 'outputs/block1_validation').resolve()
+        filename = None
+    else:
+        report = Path(options.out) if options.out else _output_path(config)/names[options.command]
+        root, filename = report.resolve().parent, report.name
+    rewritten = []
+    skip = False
+    for arg in arguments:
+        if skip: skip=False; continue
+        if arg == '--out': skip=True; continue
+        if arg.startswith('--out='): continue
+        rewritten.append(arg)
+    class ValidationStopped(RuntimeError): pass
+    result = 2
+    try:
+        with output_attempt(root, 'vlac '+options.command) as attempt:
+            result = _main(rewritten+['--out',str(attempt if filename is None else attempt/filename)])
+            if result == 2: raise ValidationStopped('Validation failed; see attempt reports')
+    except ValidationStopped:
+        return result
+    return result
 
 
 if __name__ == "__main__":

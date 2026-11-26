@@ -275,7 +275,7 @@ class ProgressReporter:
                 else f"{self.stage_current} {self.stage_unit}"
             )
             suffix = f"; stage ETA ~{_duration(eta_stage)}" if eta_stage is not None else ""
-            if self._solver_total is not None and self._solver_completed >= 2:
+            if self._solver_total is not None and self._solver_completed >= 2 and self._solver_durations:
                 average = sum(self._solver_durations) / len(self._solver_durations)
                 eta_solver = average * max(0, self._solver_total - self._solver_completed)
                 suffix += f"; total FDE ETA ~{_duration(eta_solver)}"
@@ -309,6 +309,13 @@ class ProgressReporter:
         if force or time.monotonic() - self._last_console >= 10:
             self._console(f"{self.stage_name or self.command}: {message}")
         self._write_status("running")
+
+    def native_solves(self, count):
+        """Record solver-reported native attempts; avoid fabricated per-solve timings."""
+        self._solver_started += count
+        self._solver_completed += count
+        self._record('native_solve_batch', {'attempts': count, 'completed': self._solver_completed})
+        self._write_status('running')
 
     def solver_started(self) -> float:
         self._solver_started += 1
