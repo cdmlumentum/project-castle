@@ -1,0 +1,321 @@
+# Standalone native alternatives. The algorithms are deliberately named:
+# sampled_widths (Block 1) and coordinate_pattern (Block 2), not adaptive_1d/Powell.
+# The Python package retains the original algorithms with the native FDE core.
+
+function vlac_silica_index(wavelength) {
+    squared=(wavelength*1e6)^2;
+    return sqrt(1+0.6961663*squared/(squared-0.0684043^2)+0.4079426*squared/(squared-0.1162414^2)+0.8974794*squared/(squared-9.896161^2));
+}
+
+function vlac_endpoint_mode(cfg,geometry,wavelength,guide,previous,has_previous) {
+    refs=vlac_empty_refs();
+    if (has_previous) {
+        reference=struct; reference.upper=previous; reference.lower=previous;
+        refs.n=1; items=cell(1); items{1}=reference; refs.items=items;
+    }
+    result=vlac_isolated(cfg,geometry,wavelength,guide,refs,1);
+    if (!result.ok) { return result; }
+    mode=result.mode; clad=vlac_silica_index(wavelength);
+    if (guide=="upper") { clad=max([clad,geometry.liquid_index]); }
+    if ((mode.te_fraction<cfg.minimum_te_fraction)|((has_previous)&(result.overlap<cfg.minimum_mode_overlap))|(real(mode.neff)<=clad+cfg.guided_neff_margin)) {
+        result.ok=0; result.error="rejected_endpoint_mode";
+    }
+    return result;
+}
+
+function vlac_endpoint_lower(cfg) {
+    result=struct; result.ok=0; modes=cell(2); previous=0;
+    for (iw=1:2) {
+        wavelength=cfg.endpoint_wavelengths_m(iw);
+        geometry=vlac_geometry(cfg,cfg.width_min_m,0,wavelength,"cross",cfg.geometry.h_gap_m,cfg.geometry.h_rib_m);
+        selected=vlac_endpoint_mode(cfg,geometry,wavelength,"lower",previous,iw>1);
+        if (!selected.ok) { result.error=selected.error; return result; }
+        modes{iw}=selected; previous=selected.mode;
+    }
+    result.ok=1; result.items=modes; return result;
+}
+
+function vlac_endpoint_sample(cfg,width,lower_value) {
+    result=struct; result.ok=0; result.error=""; result.width_m=width;
+    rows=cell(4); modes=cell(4); deltas=matrix(4,1); states=cell(2); states{1}="cross"; states{2}="bar";
+    for (state_index=1:2) {
+        state=states{state_index}; previous=0;
+        for (iw=1:2) {
+            wavelength=cfg.endpoint_wavelengths_m(iw);
+            geometry=vlac_geometry(cfg,width,0,wavelength,state,cfg.geometry.h_gap_m,cfg.geometry.h_rib_m);
+            upper_value=vlac_endpoint_mode(cfg,geometry,wavelength,"upper",previous,iw>1);
+            if (!upper_value.ok) { result.error=upper_value.error; return result; }
+            previous=upper_value.mode; lower_mode=lower_value.items{iw};
+            beta_upper=2*pi*upper_value.mode.neff/wavelength; beta_lower=2*pi*lower_mode.mode.neff/wavelength;
+            row=struct; row.h_gap_m=geometry.h_gap_m; row.h_rib_m=geometry.h_rib_m;
+            row.w1_m=width; row.end="width"; row.d_c2c_m=0; row.state=state; row.wavelength_m=wavelength;
+            row.beta_upper_real_rad_per_m=real(beta_upper); row.beta_upper_imag_rad_per_m=imag(beta_upper);
+            row.beta_lower_real_rad_per_m=real(beta_lower); row.beta_lower_imag_rad_per_m=imag(beta_lower);
+            row.delta_beta_real_rad_per_m=real(beta_upper-beta_lower); row.delta_beta_imag_rad_per_m=imag(beta_upper-beta_lower);
+            row.upper_mode_identity=upper_value.mode.identity; row.lower_mode_identity=lower_mode.mode.identity;
+            row.upper_te_fraction=upper_value.mode.te_fraction; row.lower_te_fraction=lower_mode.mode.te_fraction;
+            row.upper_tracking_overlap=upper_value.overlap; row.lower_tracking_overlap=lower_mode.overlap;
+            idx=(state_index-1)*2+iw; rows{idx}=row; modes{idx}=upper_value.mode; deltas(idx)=real(beta_upper-beta_lower);
+        }
+    }
+    result.ok=1; result.rows=rows; result.modes=modes; result.deltas=deltas;
+    result.score=min(abs(deltas)); return result;
+}
+
+function vlac_endpoint_pair(cfg,first,second) {
+    result=struct; result.ok=0; result.score=0; result.mismatch=2;
+    if ((!first.ok)|(!second.ok)) { return result; }
+    if (first.width_m>=second.width_m) { return result; }
+    if ((max(first.deltas(1:2))>=0)|(min(second.deltas(1:2))<=0)) { return result; }
+    mismatch=max(2*abs(abs(first.deltas(1:2))-abs(second.deltas(1:2)))/(abs(first.deltas(1:2))+abs(second.deltas(1:2))));
+    result.mismatch=mismatch;
+    if (mismatch>cfg.endpoint_balance_rtol) { return result; }
+    result.ok=1; result.score=min([first.score,second.score]); return result;
+}
+
+function vlac_endpoint_profile(cfg,mode,geometry,wavelength,guide,endpoint) {
+    packet=struct; packet.mode=mode; packet.geometry=geometry;
+    packet.guide=guide; packet.end=endpoint; packet.state=geometry.state;
+    packet.wavelength_m=wavelength; packet.coordinate_frame="guide_centered";
+    packet.x_m=linspace(-cfg.compact_x_span_m/2,cfg.compact_x_span_m/2,cfg.tracking_grid_nx);
+    packet.y_m=linspace(cfg.y_min_m,cfg.y_max_m,cfg.tracking_grid_ny);
+    if (isfield(cfg,"compact_profile")) {
+        numerical=cfg.compact_profile;
+        if (numerical.tracking_nx>0) {
+            packet.x_m=linspace(-numerical.tracking_x_span_m/2,numerical.tracking_x_span_m/2,numerical.tracking_nx);
+            packet.y_m=linspace(numerical.tracking_y_min_m,numerical.tracking_y_max_m,numerical.tracking_ny);
+        }
+    }
+    return packet;
+}
+
+function vlac_block1(cfg) {
+    result=struct; result.ok=0; result.error="no_feasible_sampled_pair";
+    result.bundle_id=cfg.bundle_id;
+    result.method="sampled_widths"; result.search_converged=0;
+    lower_value=vlac_endpoint_lower(cfg);
+    if (!lower_value.ok) { result.error=lower_value.error; return result; }
+    widths=cfg.endpoint_widths_m; samples=cell(length(widths));
+    for (idx=1:length(widths)) {
+        sample=vlac_endpoint_sample(cfg,widths(idx),lower_value);
+        if ((!sample.ok)&(sample.error!="zero_modes")&(sample.error!="rejected_endpoint_mode")) { result.error=sample.error; return result; }
+        samples{idx}=sample;
+    }
+    best_score=-1; best_mismatch=2; first_index=0; second_index=0;
+    for (first=1:length(widths)) {
+        for (second=1:length(widths)) {
+            pair=vlac_endpoint_pair(cfg,samples{first},samples{second});
+            if (pair.ok) {
+                if ((pair.score>best_score)|((pair.score==best_score)&(pair.mismatch<best_mismatch))) {
+                    best_score=pair.score; best_mismatch=pair.mismatch;
+                    first_index=first; second_index=second;
+                }
+            }
+        }
+    }
+    result.widths_m=widths;
+    if (first_index==0) { return result; }
+    # Ten completely fresh verification solves, with no solver cache.
+    verified_lower=vlac_endpoint_lower(cfg);
+    if (!verified_lower.ok) { result.error=verified_lower.error; return result; }
+    first=vlac_endpoint_sample(cfg,widths(first_index),verified_lower);
+    second=vlac_endpoint_sample(cfg,widths(second_index),verified_lower);
+    pair=vlac_endpoint_pair(cfg,first,second);
+    if (!pair.ok) { result.error="fresh_endpoint_verification_failed"; return result; }
+    original_first=samples{first_index}; original_second=samples{second_index};
+    error=max([max(abs(first.deltas-original_first.deltas)/(1e-3+1e-6*abs(original_first.deltas))),max(abs(second.deltas-original_second.deltas)/(1e-3+1e-6*abs(original_second.deltas)))]);
+    if (error>1) { result.error="fresh_endpoint_verification_mismatch"; return result; }
+    rows=cell(8);
+    for (idx=1:4) {
+        row=first.rows{idx}; row.end="input"; row.d_c2c_m=cfg.offset_input_m; rows{idx}=row;
+        row=second.rows{idx}; row.end="output"; row.d_c2c_m=cfg.offset_output_m; rows{idx+4}=row;
+    }
+    result.ok=1; result.error=""; result.w1_input_m=first.width_m; result.w1_output_m=second.width_m;
+    result.delta_scale=pair.score; result.rows=rows; result.maximum_relative_mismatch=pair.mismatch;
+    result.h_gap_m=cfg.geometry.h_gap_m; result.h_rib_m=cfg.geometry.h_rib_m;
+    profiles=cell(10);
+    for (iw=1:2) {
+        selected=verified_lower.items{iw}; wavelength=cfg.endpoint_wavelengths_m(iw);
+        geometry=vlac_geometry(cfg,cfg.width_min_m,0,wavelength,"cross",cfg.geometry.h_gap_m,cfg.geometry.h_rib_m);
+        profiles{iw}=vlac_endpoint_profile(cfg,selected.mode,geometry,wavelength,"lower","both");
+    }
+    for (idx=1:4) {
+        row=rows{idx}; geometry=vlac_geometry(cfg,first.width_m,cfg.offset_input_m,row.wavelength_m,row.state,cfg.geometry.h_gap_m,cfg.geometry.h_rib_m);
+        profiles{idx+2}=vlac_endpoint_profile(cfg,first.modes{idx},geometry,row.wavelength_m,"upper","input");
+        row=rows{idx+4}; geometry=vlac_geometry(cfg,second.width_m,cfg.offset_output_m,row.wavelength_m,row.state,cfg.geometry.h_gap_m,cfg.geometry.h_rib_m);
+        profiles{idx+6}=vlac_endpoint_profile(cfg,second.modes{idx},geometry,row.wavelength_m,"upper","output");
+    }
+    result.mode_profiles=profiles;
+    result.fresh_verification_passed=1; return result;
+}
+
+function vlac_block1_inspection(cfg,endpoint) {
+    geometry=vlac_geometry(cfg,endpoint.w1_input_m,cfg.offset_input_m,cfg.endpoint_wavelengths_m(1),"cross",endpoint.h_gap_m,endpoint.h_rib_m);
+    result=vlac_raw(cfg,geometry,cfg.endpoint_wavelengths_m(1),1,1,0);
+    return result;
+}
+
+function vlac_pchip_real(x,values,queries) {
+    count=length(x);
+    if (count==2) { return values(1)+(queries-x(1))*(values(2)-values(1))/(x(2)-x(1)); }
+    interval_widths=x(2:count)-x(1:(count-1)); slopes=(values(2:count)-values(1:(count-1)))/interval_widths;
+    derivatives=matrix(count,1);
+    for (idx=2:(count-1)) {
+        if (slopes(idx-1)*slopes(idx)>0) {
+            first_weight=2*interval_widths(idx)+interval_widths(idx-1); second_weight=interval_widths(idx)+2*interval_widths(idx-1);
+            derivatives(idx)=(first_weight+second_weight)/(first_weight/slopes(idx-1)+second_weight/slopes(idx));
+        }
+    }
+    endpoint_indices=[1;count]; left_indices=[1;count-1]; next_indices=[2;count-2];
+    for (side=1:2) {
+        idx=endpoint_indices(side); left=left_indices(side); next=next_indices(side);
+        derivative=((2*interval_widths(left)+interval_widths(next))*slopes(left)-interval_widths(left)*slopes(next))/(interval_widths(left)+interval_widths(next));
+        if (derivative*slopes(left)<=0) { derivative=0; }
+        else { if ((slopes(left)*slopes(next)<0)&(abs(derivative)>3*abs(slopes(left)))) { derivative=3*slopes(left); } }
+        derivatives(idx)=derivative;
+    }
+    result=matrix(length(queries),1);
+    for (sample=1:length(queries)) {
+        interval=count-1;
+        for (idx=1:(count-1)) { if ((queries(sample)>=x(idx))&(queries(sample)<x(idx+1))) { interval=idx; } }
+        t=(queries(sample)-x(interval))/interval_widths(interval);
+        result(sample)=(2*t^3-3*t^2+1)*values(interval)+(t^3-2*t^2+t)*interval_widths(interval)*derivatives(interval)+(-2*t^3+3*t^2)*values(interval+1)+(t^3-t^2)*interval_widths(interval)*derivatives(interval+1);
+    }
+    return result;
+}
+
+function vlac_axis_error(base,checked,old_axis,new_axis,axis,scale) {
+    result=0;
+    outer=base.nw; inner=base.nz;
+    if (axis=="wavelength") { outer=base.nz; inner=base.nw; }
+    for (attribute=1:2) {
+        denominator=scale; if (attribute==2) { denominator=scale/2; }
+        for (fixed=1:outer) {
+            values=matrix(inner,1);
+            for (moving=1:inner) {
+                index=(fixed-1)*base.nz+moving;
+                if (axis=="wavelength") { index=(moving-1)*base.nz+fixed; }
+                coefficient=base.items{index}; value=coefficient.delta_beta;
+                if (attribute==2) { value=coefficient.kappa; }
+                values(moving)=value;
+            }
+            predicted=vlac_pchip_real(old_axis,real(values),new_axis)+1i*vlac_pchip_real(old_axis,imag(values),new_axis);
+            for (moving=1:length(new_axis)) {
+                index=(fixed-1)*checked.nz+moving;
+                if (axis=="wavelength") { index=(moving-1)*checked.nz+fixed; }
+                coefficient=checked.items{index}; value=coefficient.delta_beta;
+                if (attribute==2) { value=coefficient.kappa; }
+                result=max([result,abs(value-predicted(moving))/denominator]);
+                if (coefficient.extraction_flag!="ok") { result=max([result,1]); }
+            }
+        }
+    }
+    return result;
+}
+
+function vlac_grid_checks(cfg,request,base,check_wavelength) {
+    result=struct; result.ok=1; result.error="";
+    result.z_error=-1; result.wavelength_error=-1; result.wavelength_checked=check_wavelength;
+    refined=request;
+    if ((2*length(request.z_m)-1)<=cfg.z_samples_max) {
+        refined.z_m=linspace(0,cfg.length_m,2*length(request.z_m)-1);
+        checked=vlac_profile(cfg,refined);
+        if (!checked.ok) { result.ok=0; result.error=checked.error; return result; }
+        result.z_error=vlac_axis_error(base,checked,request.z_m,refined.z_m,"z",request.delta_scale);
+    }
+    refined=request;
+    if (check_wavelength & ((2*length(request.wavelengths_m)-1)<=cfg.wavelength_samples_max)) {
+        refined.wavelengths_m=linspace(cfg.endpoint_wavelengths_m(1),cfg.endpoint_wavelengths_m(2),2*length(request.wavelengths_m)-1);
+        checked=vlac_profile(cfg,refined);
+        if (!checked.ok) { result.ok=0; result.error=checked.error; return result; }
+        result.wavelength_error=vlac_axis_error(base,checked,request.wavelengths_m,refined.wavelengths_m,"wavelength",request.delta_scale);
+    }
+    result.passed=(result.z_error>=0)&(result.z_error<=cfg.grid_tolerance);
+    if (check_wavelength) { result.passed=result.passed&(result.wavelength_error>=0)&(result.wavelength_error<=cfg.grid_tolerance); }
+    return result;
+}
+
+function vlac_request(cfg,endpoint) {
+    request=struct; request.h_gap_m=endpoint.h_gap_m; request.h_rib_m=endpoint.h_rib_m;
+    request.w_control_m=linspace(endpoint.w1_input_m,endpoint.w1_output_m,cfg.control_points);
+    request.d_control_m=linspace(cfg.offset_input_m,cfg.offset_output_m,cfg.control_points);
+    request.z_m=linspace(0,cfg.length_m,cfg.z_samples_initial);
+    request.wavelengths_m=cfg.endpoint_wavelengths_m;
+    request.delta_scale=endpoint.delta_scale; request.state="cross"; return request;
+}
+
+function vlac_pattern(cfg,request) {
+    result=struct; result.ok=0; result.error="";
+    best=vlac_profile(cfg,request);
+    if (!best.ok) { return best; }
+    evaluations=1; step=0.2; count=length(request.w_control_m);
+    directions=[-1;1]; converged=0; finished=0;
+    for (sweep=1; (sweep<=10000)&(!finished); sweep=sweep+1) {
+        improved=0;
+        for (coordinate=1:(2*(count-2))) {
+            for (direction=1:2) {
+                if (evaluations<cfg.profile_evaluation_budget) {
+                    candidate=request;
+                    if (coordinate<=(count-2)) {
+                        idx=coordinate+1;
+                        candidate.w_control_m(idx)=min([cfg.width_max_m,max([cfg.width_min_m,request.w_control_m(idx)+directions(direction)*step*(cfg.width_max_m-cfg.width_min_m)])]);
+                    } else {
+                        idx=coordinate-(count-2)+1;
+                        candidate.d_control_m(idx)=min([cfg.offset_max_m,max([cfg.offset_min_m,request.d_control_m(idx)+directions(direction)*step*(cfg.offset_max_m-cfg.offset_min_m)])]);
+                    }
+                    value=vlac_profile(cfg,candidate); evaluations=evaluations+1;
+                    if (!value.ok) { return value; }
+                    if (value.objective<best.objective) { request=candidate; best=value; improved=1; }
+                }
+            }
+        }
+        if (!improved) { step=step/2; }
+        if (step<=cfg.minimum_control_step_fraction) { converged=1; finished=1; }
+        if (evaluations>=cfg.profile_evaluation_budget) { finished=1; }
+    }
+    result.ok=1; result.request=request; result.grid=best; result.evaluations=evaluations;
+    result.optimizer_converged=converged; result.method="coordinate_pattern"; return result;
+}
+
+function vlac_block2(cfg,endpoint) {
+    result=struct; result.ok=0; result.error="incomplete_upstream_block";
+    if (!endpoint.ok) { return result; }
+    result.error="incompatible_native_bundle";
+    if (endpoint.bundle_id!=cfg.bundle_id) { return result; }
+    result.bundle_id=cfg.bundle_id;
+    request=vlac_request(cfg,endpoint); convergence_history=cell(cfg.max_grid_refinements+1);
+    finished=0; completed_refinements=0;
+    for (refinement=1; (refinement<=(cfg.max_grid_refinements+1))&(!finished); refinement=refinement+1) {
+        optimized=vlac_pattern(cfg,request);
+        if (!optimized.ok) { return optimized; }
+        request=optimized.request; grid=optimized.grid;
+        checks=vlac_grid_checks(cfg,request,grid,0);
+        if (!checks.ok) { return checks; }
+        convergence_history{refinement}=checks;
+        completed_refinements=refinement;
+        if (checks.passed) { finished=1; }
+        if ((!finished)&(refinement<=cfg.max_grid_refinements)&(checks.z_error>cfg.grid_tolerance)) {
+            request.z_m=linspace(0,cfg.length_m,2*length(request.z_m)-1);
+        }
+    }
+    result.ok=1; result.error=""; result.request=optimized.request; result.grid=grid;
+    result.endpoint=endpoint; result.grid_checks=checks;
+    result.optimizer_converged=optimized.optimizer_converged; result.method=optimized.method;
+    result.evaluations=optimized.evaluations; result.grid_history=convergence_history; result.refinements=completed_refinements;
+    return result;
+}
+
+function vlac_block3(cfg,profile) {
+    result=struct; result.ok=0; result.error="incomplete_upstream_block";
+    if (!profile.ok) { return result; }
+    result.error="incompatible_native_bundle";
+    if (profile.bundle_id!=cfg.bundle_id) { return result; }
+    result.bundle_id=cfg.bundle_id;
+    request=profile.request; request.state="bar";
+    grid=vlac_profile(cfg,request);
+    if (!grid.ok) { return grid; }
+    checks=vlac_grid_checks(cfg,request,grid,1);
+    if (!checks.ok) { return checks; }
+    result.ok=1; result.error=""; result.profile=profile; result.grid=grid;
+    result.request=request; result.grid_checks=checks; return result;
+}

@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+build/
+dist/
+*.egg-info/
+outputs/
+diagnostics/**/*.lms
+diagnostics/
+tmp/
+
+# User-supplied reference copies are local; register links/provenance instead.
+docs/references/*.pdf
+docs/references/*.pptx

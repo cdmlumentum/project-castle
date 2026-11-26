@@ -1,0 +1,350 @@
+# Native MODE/FDE calculation core. SI units throughout.
+# The interpolation, transverse-field norm, selectors and coupling convention
+# reproduce the v23 Python implementation. Load this file before vlac_blocks.lsf.
+
+function vlac_empty_refs() {
+    result=struct; result.n=0; result.items=cell(1); return result;
+}
+
+function vlac_overlap(first,second) {
+    numerator=sum(conj(first.ex)*second.ex+conj(first.ey)*second.ey);
+    norm_a=sum(abs(first.ex)^2+abs(first.ey)^2);
+    norm_b=sum(abs(second.ex)^2+abs(second.ey)^2);
+    result=0;
+    if ((norm_a>0)&(norm_b>0)) {
+        result=min([1,max([0,abs(numerator)/sqrt(norm_a*norm_b)])]);
+    }
+    return result;
+}
+
+function vlac_material(name,table,fit_count) {
+    if (!materialexists(name)) {
+        temporary=addmaterial("Sampled data");
+        setmaterial(temporary,"name",name);
+    }
+    setmaterial(name,"max coefficients",fit_count);
+    setmaterial(name,"sampled data",table);
+    return name;
+}
+
+function vlac_rectangle(name,material,xc,yc,xspan,yspan,enabled) {
+    addrect; set("name",name); set("material",material);
+    set("x",xc); set("y",yc); set("x span",xspan); set("y span",yspan);
+    set("enabled",enabled);
+    return 1;
+}
+
+function vlac_raw(cfg,geometry,wavelength,upper_enabled,lower_enabled,compact) {
+    result=struct; result.ok=0; result.error="zero_modes";
+    result.n=0; result.items=cell(1); result.attempts=0;
+    xspan=cfg.x_span_m; nx=cfg.mesh_cells_x;
+    if (compact) { xspan=cfg.compact_x_span_m; nx=cfg.compact_mesh_cells_x; }
+    ymin=cfg.y_min_m; ymax=cfg.y_max_m; ny=cfg.mesh_cells_y;
+    calibrated=0;
+    if (isfield(cfg,"full_profile")) {
+        numerical=cfg.full_profile;
+        if (compact) { numerical=cfg.compact_profile; }
+        xspan=numerical.x_span_m; nx=numerical.mesh_cells_x; ny=numerical.mesh_cells_y;
+        ymin=numerical.y_min_m; ymax=numerical.y_max_m; calibrated=1;
+    }
+    xtrack=linspace(-xspan/2,xspan/2,cfg.tracking_grid_nx);
+    ytrack=linspace(ymin,ymax,cfg.tracking_grid_ny);
+    if (calibrated) {
+        if (numerical.tracking_nx>0) {
+            xtrack=linspace(-numerical.tracking_x_span_m/2,numerical.tracking_x_span_m/2,numerical.tracking_nx);
+            ytrack=linspace(numerical.tracking_y_min_m,numerical.tracking_y_max_m,numerical.tracking_ny);
+        }
+    }
+    if (isfield(cfg,"comparison_enabled")) {
+        if (cfg.comparison_enabled) { xtrack=cfg.comparison_x_m; ytrack=cfg.comparison_y_m; }
+    }
+    xx=meshgridx(xtrack,ytrack); yy=meshgridy(xtrack,ytrack);
+    upper_x=geometry.d_c2c_m;
+    if (compact) { upper_x=0; }
+    upper_y=geometry.h_wg_m+geometry.h_gap_m;
+    for (attempt=1:(cfg.zero_mode_retries+1)) {
+        # Rebuild layout only. Material fits survive ordinary consecutive solves.
+        # A zero-mode retry starts an entirely fresh project, as in v23.
+        if (attempt>1) { newproject; }
+        switchtolayout; selectall; delete;
+        silica=vlac_material("SiO2_Malitson_1965",cfg.silica_table,cfg.material_fit_max_coefficients);
+        nitride=vlac_material("Si3N4_Luke_2015_provisional",cfg.sin_table,cfg.material_fit_max_coefficients);
+        liquid_table=cfg.silica_table;
+        liquid_table(:,2)=geometry.liquid_index^2;
+        liquid=vlac_material("VLAC_NATIVE_Liquid",liquid_table,cfg.material_fit_max_coefficients);
+        vlac_rectangle("buried_oxide_and_gap",silica,0,(ymin+upper_y)/2,xspan,upper_y-ymin,1);
+        vlac_rectangle("upper_liquid_cladding",liquid,0,(upper_y+ymax)/2,xspan,ymax-upper_y,1);
+        if (geometry.h_rib_m>0) {
+            vlac_rectangle("lower_slab",nitride,0,geometry.h_rib_m/2,xspan,geometry.h_rib_m,lower_enabled);
+            vlac_rectangle("upper_slab",nitride,0,upper_y+geometry.h_rib_m/2,xspan,geometry.h_rib_m,upper_enabled);
+        }
+        ridge_height=geometry.h_wg_m-geometry.h_rib_m;
+        vlac_rectangle("lower_ridge",nitride,0,geometry.h_rib_m+ridge_height/2,geometry.w2_m,ridge_height,lower_enabled);
+        vlac_rectangle("upper_ridge",nitride,upper_x,upper_y+geometry.h_rib_m+ridge_height/2,geometry.w1_m,ridge_height,upper_enabled);
+        addfde;
+        set("solver type",3); set("z",0);
+        set("x",0); set("x span",xspan);
+        set("y",(ymin+ymax)/2); set("y span",ymax-ymin);
+        set("mesh cells x",nx); set("mesh cells y",ny);
+        set("x min bc","PML"); set("x max bc","PML");
+        set("y min bc","PML"); set("y max bc","PML");
+        if (calibrated) {
+            set("pml layers",numerical.pml_layers); set("autoscale pml parameters",1);
+            if ((numerical.local_dx_m>0)|(numerical.local_dy_m>0)) {
+                for (guide_index=1:2) {
+                    active=lower_enabled; center_x=0; center_y=geometry.h_wg_m/2; guide_width=geometry.w2_m;
+                    if (guide_index==2) { active=upper_enabled; center_x=upper_x; center_y=upper_y+geometry.h_wg_m/2; guide_width=geometry.w1_m; }
+                    if (active) {
+                        addmesh; set("name","vlac_local_"+num2str(guide_index));
+                        set("x",center_x); set("x span",guide_width+2*numerical.local_padding_m);
+                        set("y",center_y); set("y span",geometry.h_wg_m+2*numerical.local_padding_m);
+                        set("z",0); set("z span",1e-6);
+                        set("override x mesh",numerical.local_dx_m>0);
+                        set("override y mesh",numerical.local_dy_m>0); set("override z mesh",0);
+                        set("set maximum mesh step",1);
+                        if (numerical.local_dx_m>0) { set("dx",numerical.local_dx_m); }
+                        if (numerical.local_dy_m>0) { set("dy",numerical.local_dy_m); }
+                    }
+                }
+                select("FDE");
+            }
+        }
+        setanalysis("wavelength",wavelength);
+        setanalysis("number of trial modes",cfg.number_of_trial_modes);
+        setanalysis("search","near n"); setanalysis("use max index",1);
+        findmodes;
+        result.attempts=attempt;
+        count=nummodes;
+        if (count>0) {
+            cards=cell(count); usable=0;
+            for (mode_index=1:count) {
+                card="mode"+num2str(mode_index);
+                x=pinch(getdata(card,"x")); y=pinch(getdata(card,"y"));
+                ex=interp(pinch(getdata(card,"Ex")),x,y,xtrack,ytrack);
+                ey=interp(pinch(getdata(card,"Ey")),x,y,xtrack,ytrack);
+                # scipy RegularGridInterpolator uses zero outside the field grid.
+                inside=(xx>=min(x))&(xx<=max(x))&(yy>=min(y))&(yy<=max(y));
+                ex=ex*inside; ey=ey*inside;
+                field_norm=sqrt(sum(abs(ex)^2+abs(ey)^2));
+                if ((field_norm>0)&(field_norm<1e300)) {
+                    snapshot=struct;
+                    mesh_info=struct;
+                    mesh_info.field_grid_intervals_x=length(x)-1; mesh_info.field_grid_intervals_y=length(y)-1;
+                    mesh_info.minimum_dx_m=min(x(2:length(x))-x(1:(length(x)-1)));
+                    mesh_info.maximum_dx_m=max(x(2:length(x))-x(1:(length(x)-1)));
+                    mesh_info.minimum_dy_m=min(y(2:length(y))-y(1:(length(y)-1)));
+                    mesh_info.maximum_dy_m=max(y(2:length(y))-y(1:(length(y)-1)));
+                    snapshot.mesh=mesh_info;
+                    snapshot.neff=getdata(card,"neff");
+                    snapshot.ex=ex/field_norm; snapshot.ey=ey/field_norm;
+                    snapshot.te_fraction=sum(abs(snapshot.ex)^2);
+                    intensity=abs(snapshot.ex)^2+abs(snapshot.ey)^2;
+                    fraction=0;
+                    if (upper_enabled) {
+                        mask=(abs(xx-upper_x)<=geometry.w1_m/2)&(yy>=upper_y)&(yy<=upper_y+geometry.h_wg_m);
+                        fraction=sum(intensity*mask)/sum(intensity);
+                    }
+                    if (lower_enabled) {
+                        mask=(abs(xx)<=geometry.w2_m/2)&(yy>=0)&(yy<=geometry.h_wg_m);
+                        fraction=max([fraction,sum(intensity*mask)/sum(intensity)]);
+                    }
+                    snapshot.core_fraction=fraction;
+                    snapshot.identity=card+"@"+num2str(real(snapshot.neff),"%.9f");
+                    usable=usable+1; cards{usable}=snapshot;
+                }
+            }
+            result.n=usable; result.items=cards;
+            result.ok=(usable>0); result.error="unusable_fields";
+            if (result.ok) { result.error=""; }
+            return result;
+        }
+    }
+    return result;
+}
+
+function vlac_choose_mode(candidates,refs,guide,threshold) {
+    result=struct; result.ok=0; result.error=candidates.error;
+    if (!candidates.ok) { return result; }
+    eligible=0;
+    for (idx=1:candidates.n) { candidate=candidates.items{idx}; if (candidate.te_fraction>=threshold) { eligible=eligible+1; } }
+    best_score=-1; best_neff=-1e300;
+    for (idx=1:candidates.n) {
+        mode=candidates.items{idx}; overlap_value=0;
+        if ((eligible==0)|(mode.te_fraction>=threshold)) {
+            if (refs.n>0) {
+                for (reference_index=1:refs.n) {
+                    reference=refs.items{reference_index}; other=reference.lower;
+                    if (guide=="upper") { other=reference.upper; }
+                    overlap_value=max([overlap_value,vlac_overlap(mode,other)]);
+                }
+                score=0.7*overlap_value+0.2*mode.core_fraction+0.1*mode.te_fraction;
+            } else { score=0.65*mode.core_fraction+0.35*mode.te_fraction; overlap_value=1; }
+            if ((score>best_score)|((score==best_score)&(real(mode.neff)>best_neff))) {
+                result.mode=mode; result.overlap=overlap_value;
+                best_score=score; best_neff=real(mode.neff); result.ok=1; result.error="";
+            }
+        }
+    }
+    return result;
+}
+
+function vlac_isolated(cfg,geometry,wavelength,guide,refs,compact) {
+    upper_value=(guide=="upper");
+    candidates=vlac_raw(cfg,geometry,wavelength,upper_value,!upper_value,compact);
+    selected=vlac_choose_mode(candidates,refs,guide,cfg.minimum_te_fraction);
+    selected.attempts=candidates.attempts;
+    return selected;
+}
+
+function vlac_choose_pair(candidates,upper_value,lower_value,refs,threshold) {
+    result=struct; result.ok=0; result.error=candidates.error;
+    if (!candidates.ok) { return result; }
+    eligible=0;
+    for (idx=1:candidates.n) { candidate=candidates.items{idx}; if (candidate.te_fraction>=threshold) { eligible=eligible+1; } }
+    best_score=-1;
+    if (candidates.n>1) {
+        for (first=1:(candidates.n-1)) {
+            for (second=(first+1):candidates.n) {
+                one=candidates.items{first}; two=candidates.items{second};
+                if ((eligible==0)|((one.te_fraction>=threshold)&(two.te_fraction>=threshold))) {
+                    bare=vlac_overlap(one,upper_value)^2+vlac_overlap(one,lower_value)^2+vlac_overlap(two,upper_value)^2+vlac_overlap(two,lower_value)^2;
+                    tracking=1; track_score=0;
+                    if (refs.n>0) {
+                        tracking=0;
+                        for (reference_index=1:refs.n) {
+                            reference=refs.items{reference_index};
+                            assignment_a=vlac_overlap(one,reference.plus)+vlac_overlap(two,reference.minus);
+                            assignment_b=vlac_overlap(one,reference.minus)+vlac_overlap(two,reference.plus);
+                            tracking=max([tracking,max([assignment_a,assignment_b])/2]);
+                        }
+                        track_score=tracking;
+                    }
+                    score=0.75*bare/4+0.25*track_score;
+                    if (score>best_score) {
+                        best_score=score; result.plus=one; result.minus=two;
+                        if (real(two.neff)>real(one.neff)) { result.plus=two; result.minus=one; }
+                        result.overlap=tracking; result.ok=1; result.error="";
+                    }
+                }
+            }
+        }
+    }
+    if (!result.ok) { result.error="fewer_than_two_eligible_supermodes"; }
+    return result;
+}
+
+function vlac_extract(beta_upper,beta_lower,beta_plus,beta_minus,previous_kappa,has_previous) {
+    result=struct;
+    result.beta_upper=beta_upper; result.beta_lower=beta_lower;
+    result.beta_plus=beta_plus; result.beta_minus=beta_minus;
+    result.delta_beta=beta_upper-beta_lower;
+    result.delta_12=result.delta_beta/2; result.delta_pm=(beta_plus-beta_minus)/2;
+    squared=result.delta_pm^2-result.delta_12^2;
+    kappa=sqrt(squared+0i);
+    if (has_previous) {
+        if (abs(-kappa-previous_kappa)<abs(kappa-previous_kappa)) { kappa=-kappa; }
+    } else {
+        if ((real(kappa)<-1e-12)|((abs(real(kappa))<=1e-12)&(imag(kappa)<0))) { kappa=-kappa; }
+    }
+    result.kappa=kappa; result.extraction_flag="ok";
+    scale=max([abs(result.delta_pm)^2,abs(result.delta_12)^2,1]);
+    if ((real(squared)<-1e-8*scale)&(abs(imag(squared))<1e-8*scale)) { result.extraction_flag="negative_kappa_squared"; }
+    return result;
+}
+
+function vlac_coefficients(cfg,geometry,wavelength,refs,previous_kappa,has_previous) {
+    result=struct; result.ok=0;
+    upper_value=vlac_isolated(cfg,geometry,wavelength,"upper",refs,0);
+    if (!upper_value.ok) { result.error=upper_value.error; return result; }
+    lower_value=vlac_isolated(cfg,geometry,wavelength,"lower",refs,0);
+    if (!lower_value.ok) { result.error=lower_value.error; return result; }
+    candidates=vlac_raw(cfg,geometry,wavelength,1,1,0);
+    pair=vlac_choose_pair(candidates,upper_value.mode,lower_value.mode,refs,cfg.minimum_te_fraction);
+    if (!pair.ok) { result.error=pair.error; return result; }
+    scale=2*pi/wavelength;
+    coefficients=vlac_extract(scale*upper_value.mode.neff,scale*lower_value.mode.neff,scale*pair.plus.neff,scale*pair.minus.neff,previous_kappa,has_previous);
+    overlap_ul=vlac_overlap(upper_value.mode,lower_value.mode);
+    upper_weight=vlac_overlap(pair.plus,upper_value.mode)^2;
+    lower_weight=vlac_overlap(pair.plus,lower_value.mode)^2;
+    coefficients.kappa_profile_check=-1; # Python restores NaN when unavailable.
+    if (((upper_weight+lower_weight)>0)&(overlap_ul<=cfg.field_overlap_crosscheck_max_basis_overlap)) {
+        coefficients.kappa_profile_check=abs(coefficients.delta_pm)*2*sqrt(upper_weight*lower_weight)/(upper_weight+lower_weight);
+    }
+    coefficients.overlap_upper_lower=overlap_ul;
+    coefficients.min_mode_overlap=min([upper_value.overlap,lower_value.overlap,pair.overlap]);
+    coefficients.upper_identity=upper_value.mode.identity; coefficients.lower_identity=lower_value.mode.identity;
+    coefficients.plus_identity=pair.plus.identity; coefficients.minus_identity=pair.minus.identity;
+    if (coefficients.min_mode_overlap<cfg.minimum_mode_overlap) { coefficients.extraction_flag="low_mode_overlap"; }
+    reference=struct; reference.upper=upper_value.mode; reference.lower=lower_value.mode;
+    reference.plus=pair.plus; reference.minus=pair.minus;
+    result.ok=1; result.error=""; result.coefficients=coefficients; result.reference=reference;
+    result.solves=upper_value.attempts+lower_value.attempts+candidates.attempts;
+    return result;
+}
+
+function vlac_bspline(controls,positions,device_length) {
+    count=length(controls); degree=3;
+    knots=matrix(count+4,1); knots((count+1):(count+4))=1;
+    if (count>4) { interior=linspace(0,1,count-2); knots(5:count)=interior(2:(count-3)); }
+    values=matrix(length(positions),1);
+    for (sample=1:length(positions)) {
+        u=positions(sample)/device_length;
+        if (u>=1) { values(sample)=controls(count); }
+        else {
+            basis=matrix(count+3,1);
+            for (idx=1:(count+3)) { basis(idx)=(u>=knots(idx))&(u<knots(idx+1)); }
+            for (order=1:degree) {
+                next=matrix(count+3,1);
+                for (idx=1:(count+3-order)) {
+                    denominator=knots(idx+order)-knots(idx);
+                    if (denominator>0) { next(idx)=next(idx)+(u-knots(idx))*basis(idx)/denominator; }
+                    denominator=knots(idx+order+1)-knots(idx+1);
+                    if (denominator>0) { next(idx)=next(idx)+(knots(idx+order+1)-u)*basis(idx+1)/denominator; }
+                }
+                basis=next;
+            }
+            values(sample)=sum(controls*basis(1:count));
+        }
+    }
+    return values;
+}
+
+function vlac_geometry(cfg,width,offset,wavelength,state,gap,rib) {
+    geometry=cfg.geometry; geometry.w1_m=width; geometry.d_c2c_m=offset;
+    geometry.h_gap_m=gap; geometry.h_rib_m=rib; geometry.state=state;
+    liquid=cfg.liquid_cross_n;
+    if (state=="bar") { liquid=cfg.liquid_bar_n; }
+    geometry.liquid_index=interp(liquid,cfg.liquid_wavelengths_m,wavelength);
+    return geometry;
+}
+
+function vlac_profile(cfg,request) {
+    result=struct; result.ok=0; result.error="";
+    nz=length(request.z_m); nw=length(request.wavelengths_m);
+    widths=vlac_bspline(request.w_control_m,request.z_m,cfg.length_m);
+    offsets=vlac_bspline(request.d_control_m,request.z_m,cfg.length_m);
+    grid=cell(nw*nz); previous_lambda=cell(nz); objective=0;
+    theta=pi*request.z_m/cfg.length_m-0.5952*sin(2*pi*request.z_m/cfg.length_m)+0.0476*sin(4*pi*request.z_m/cfg.length_m);
+    delta_target=-request.delta_scale*cos(theta); kappa_target=request.delta_scale*sin(theta)/2;
+    for (iw=1:nw) {
+        current_lambda=cell(nz); previous_kappa=0;
+        for (iz=1:nz) {
+            refs=vlac_empty_refs(); items=cell(2);
+            if (iz>1) { refs.n=refs.n+1; items{refs.n}=previous_z; }
+            if (iw>1) { refs.n=refs.n+1; items{refs.n}=previous_lambda{iz}; }
+            refs.items=items;
+            geometry=vlac_geometry(cfg,widths(iz),offsets(iz),request.wavelengths_m(iw),request.state,request.h_gap_m,request.h_rib_m);
+            sample=vlac_coefficients(cfg,geometry,request.wavelengths_m(iw),refs,previous_kappa,iz>1);
+            if (!sample.ok) { result.error=sample.error; result.failed_wavelength=request.wavelengths_m(iw); result.failed_z=request.z_m(iz); return result; }
+            grid{(iw-1)*nz+iz}=sample.coefficients;
+            current_lambda{iz}=sample.reference; previous_z=sample.reference;
+            previous_kappa=sample.coefficients.kappa;
+            objective=max([objective,abs(real(sample.coefficients.delta_beta)-delta_target(iz))/request.delta_scale,abs(sample.coefficients.kappa-kappa_target(iz))/(request.delta_scale/2)]);
+        }
+        previous_lambda=current_lambda;
+    }
+    result.ok=1; result.items=grid; result.nz=nz; result.nw=nw;
+    result.objective=objective; result.delta_target=delta_target; result.kappa_target=kappa_target;
+    result.widths_m=widths; result.offsets_m=offsets;
+    return result;
+}

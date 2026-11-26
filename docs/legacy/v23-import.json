@@ -1,0 +1,198 @@
+{
+  "archive": "vertical_liquid_adiabatic_coupler_v23.zip",
+  "archive_sha256": "5b2f588b9e9631b0449e3191d2c2593b08d7f2c9a552f9b89fd8dbe314e642c2",
+  "files": [
+    {
+      "path": ".gitignore",
+      "sha256": "91955abeeeb63c101f69a9e0e92db97cc8409b6062a9bc3639ef480c4acfb786"
+    },
+    {
+      "path": "CHANGES_v16.md",
+      "sha256": "160f58f646e76d2b4ee40f9656e17b219eb6b11df004fae8420dc13aba037ead"
+    },
+    {
+      "path": "CHANGES_v17.md",
+      "sha256": "10673c8c66c0713c39ae69802c92e4380a2cb0bda8b896dd27b2191494be1f4e"
+    },
+    {
+      "path": "CHANGES_v18.md",
+      "sha256": "208230e6aae5a3768358d81919de8eb32c4a874a301d3900b2fd7b67ee217ac8"
+    },
+    {
+      "path": "CHANGES_v19.md",
+      "sha256": "5d2e99be17389555deec0168e9509fcc9df851f917cd30125ac130c7415428cc"
+    },
+    {
+      "path": "CHANGES_v20.md",
+      "sha256": "868efb2d240da9317137d76a939b9d91b3d2deb7663ca4f957656cff356f070a"
+    },
+    {
+      "path": "CHANGES_v21.md",
+      "sha256": "776cd40b47b707e70bc842145355b1bfe6dfa272191fe5a56fb01c9f76e22d2c"
+    },
+    {
+      "path": "CHANGES_v22.md",
+      "sha256": "43d066a90a16e85c0945efb5051dc91920e7dd7a8ddce0b834160478dd4d6677"
+    },
+    {
+      "path": "CHANGES_v23.md",
+      "sha256": "49766a87e7184a5d7e9ccc02e44c8c2026e07111c14caf65e1dadc95da860c88"
+    },
+    {
+      "path": "README.md",
+      "sha256": "d949c358b590c71f89f5d5426cb6a0a301e339d6bac71dc7e516fdfded3516c9"
+    },
+    {
+      "path": "config/default.json",
+      "sha256": "b88bd669e7ec106c0845b6c42b0b82c4c3affcc138551429bbabe465bae53038"
+    },
+    {
+      "path": "data/README.md",
+      "sha256": "1f2413658e0107678fd8a2ddea651c9901d8bbfe6088346e9a9486baab25322a"
+    },
+    {
+      "path": "data/green_si_2008_1260_1340.csv",
+      "sha256": "ef2b395cad949fc47211cb3c51662c5fdbfb3b973d65f6a47f5fd14ef5ad0618"
+    },
+    {
+      "path": "docs/block_handoffs_v22.md",
+      "sha256": "b2a58ffea769a1feec0f7285761d31d90664b3ae0545d7a8d8c42b8e51357704"
+    },
+    {
+      "path": "docs/efficiency_v18.md",
+      "sha256": "7eebd16dc3effd83bc545f8c97e45a2b986a1c42642d35f2730f20c4f32d992b"
+    },
+    {
+      "path": "docs/endpoint_balance_v21.md",
+      "sha256": "e90c95cd492c4bff5ae23ea0f7c37330fe2bbfba2f701e35953ed63111aaac4c"
+    },
+    {
+      "path": "docs/python_pso_endpoint_plan.md",
+      "sha256": "1fe5d7d2a769f862ea4ee133f38e7bb887647f1d59aff3c8adc8c9f71f81028a"
+    },
+    {
+      "path": "pyproject.toml",
+      "sha256": "8598da08d0e93d3c1023eddbc76722b10ca735384879d1e8a552b8ca688d3567"
+    },
+    {
+      "path": "src/vlac/__init__.py",
+      "sha256": "67350b2db6986cd94da6d4789aad1fa320477f3431e5bbf409ffb7974c8692f5"
+    },
+    {
+      "path": "src/vlac/adaptive_endpoint.py",
+      "sha256": "a5b83c10b3291d2a45e07ccc205f02c4ecd56ca796c58c13074ff2a806c4f41f"
+    },
+    {
+      "path": "src/vlac/block_exports.py",
+      "sha256": "86099c4bdf92ed062bbb5ce8277a4a6725a22d9488df4b77a0a0162ed9cd4a8b"
+    },
+    {
+      "path": "src/vlac/block_io.py",
+      "sha256": "83afd2d67088aca6b14ed112edc22e763e8975ecf22e3fda55301941d510ada8"
+    },
+    {
+      "path": "src/vlac/blocks.py",
+      "sha256": "7c3798f33895594503eb4ed2b60acfd9abba70983156dc6aa84ae71ec0600697"
+    },
+    {
+      "path": "src/vlac/cache.py",
+      "sha256": "c163d6939750b2e88244c3bafbf5a40d645d3472d0b8830f2ce63b9610876f2a"
+    },
+    {
+      "path": "src/vlac/cli.py",
+      "sha256": "edcf35a4d640a06f62fc2efa1efc5ba03fdc441ba6e12bc5aa7ca9c20f39832d"
+    },
+    {
+      "path": "src/vlac/config.py",
+      "sha256": "6da280c373ca5cb4fa0055419ab9a73bdba8f225453365c9c28f6e48dc8f0313"
+    },
+    {
+      "path": "src/vlac/endpoint.py",
+      "sha256": "72d63b398adc95fb180ed429879a014b3ac5cae33484291d1c5c3eeeb9c1c2ab"
+    },
+    {
+      "path": "src/vlac/endpoint_constraints.py",
+      "sha256": "69fc69905355e953db2c14afe2ab02e3e41d7620eaf30b3ecbf139e783f6917e"
+    },
+    {
+      "path": "src/vlac/export.py",
+      "sha256": "9074ec95866c0047e3789c3e61bc5d77e98113eaeda812246f9664f37adcee63"
+    },
+    {
+      "path": "src/vlac/full_device_validation.py",
+      "sha256": "11a60f3ce265c4d3ff79a18339bcf041f9efaa71d43ac1d8611a805f6d83d5fb"
+    },
+    {
+      "path": "src/vlac/geometry.py",
+      "sha256": "b45f51705d5255e757db2b7f094913b4084f4f9f97b6d3da17fa47e3dbb8736b"
+    },
+    {
+      "path": "src/vlac/materials.py",
+      "sha256": "e521ea299b041b2ea4a7ee099e5774dfcb305e3f649e9c81be9e0cee24e49d76"
+    },
+    {
+      "path": "src/vlac/modes.py",
+      "sha256": "2e927d4b93dddd7fc173a6a94bb262966c2682ca7760f395675ef6972144f340"
+    },
+    {
+      "path": "src/vlac/optimize.py",
+      "sha256": "1912c80713e522b8667a4b6ded4748affca312d85b29a09bd46f697714392323"
+    },
+    {
+      "path": "src/vlac/profiles.py",
+      "sha256": "a2704ddd7d41bf484d9d294985aca7d1c27171b7cef4c3d43de34b494b07baae"
+    },
+    {
+      "path": "src/vlac/progress.py",
+      "sha256": "a013f9eca7f00637be214dc60d1b4d4dc1cadfb1a1abc36cd3fabb269e331fdd"
+    },
+    {
+      "path": "src/vlac/propagate.py",
+      "sha256": "7d1a83827fac6d739a4ff5da6eb80433a6b89f4592416b6c2a828d23ad5f617d"
+    },
+    {
+      "path": "src/vlac/python_pso.py",
+      "sha256": "d0cd2ea46cccd2ec7b179a2afba53525ff3ebd1d686d17c5f28b973f2d998f07"
+    },
+    {
+      "path": "src/vlac/solver.py",
+      "sha256": "0cca7f93a76c095c414b48cb843a3cfd13d9cb14b8e669a1e7533e5bf0f8e74d"
+    },
+    {
+      "path": "src/vlac/validation.py",
+      "sha256": "bd0fcc38653109d8c36dfd0fc86c8476fc4753fb7dc186c45805cc96566a4e0e"
+    },
+    {
+      "path": "tests/test_block_handoffs.py",
+      "sha256": "8b21d9a66101cddd61c134a29454efc7f7392ee83026b1236531f2b012d56ea3"
+    },
+    {
+      "path": "tests/test_efficiency.py",
+      "sha256": "a53a58ace83a0ee135e12ee3f4dcc71a01695172b89237cd33406f00f156a2a5"
+    },
+    {
+      "path": "tests/test_python_pso.py",
+      "sha256": "05881b25efcbb21e603733f09a637f7d059b11b9c537fd6f9e2994e892b1ba0e"
+    },
+    {
+      "path": "tests/test_revision_v21.py",
+      "sha256": "bd31d5c921876860e1a043ab9da65c09660117ec755fce544e0431e2ce143b50"
+    },
+    {
+      "path": "tests/test_zero_mode_recovery.py",
+      "sha256": "e3add2200a56e3f79844a6a7fc0708e9bc25f0ea9299bc779ff1987fc0eac609"
+    },
+    {
+      "path": "validation/analytic_validation.json",
+      "sha256": "2db54eb234dfb5411482cda36f0057986e120492ac5f10d717e41add9092a711"
+    },
+    {
+      "path": "validation/release_validation.json",
+      "sha256": "f36ee08abd21f38298bc16b91289df0e9c7ea35fffc5011539913004473a2b56"
+    },
+    {
+      "path": "validation/test_results.txt",
+      "sha256": "2722bd6c7d2b1637b335879ec0b0347f8db9c80ba240ffc637c82c2b0a0bba95"
+    }
+  ]
+}

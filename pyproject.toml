@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vertical-liquid-adiabatic-coupler"
+version = "0.25.0"
+description = "Reproducible MODE/FDE workflow for a liquid-controlled vertical SiN adiabatic coupler"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy>=1.24",
+  "scipy>=1.10",
+  "matplotlib>=3.7",
+]
+
+[project.scripts]
+vlac = "vlac.cli:main"
+vlac-native = "vlac.native_mode:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+vlac = ["native/*.lsf"]

@@ -1,0 +1,21 @@
+{
+  "version": "0.25.0",
+  "created_utc": "2026-11-26T19:36:23.479577+00:00",
+  "unit_tests": {
+    "status": "passed",
+    "count": 100,
+    "seconds": 283.286,
+    "command": "python tools/run_tests.py",
+    "optical_data": "synthetic fixtures only"
+  },
+  "wheel": {
+    "status": "built_and_checked",
+    "name": "vertical_liquid_adiabatic_coupler-0.25.0-py3-none-any.whl",
+    "sha256": "89e572729564b72d20dbe08e95bbdb6f087aa7dcd394a9e8f22446f2a6db45f3",
+    "all_python_lsf_files_byte_match": true,
+    "matched_files": 29
+  },
+  "licensed_block0_trial": "deferred_at_user_request; not run",
+  "production_block0_certificate_issued": false,
+  "scope": "Offline functionality, numerical gates, checked resume, certificate and package handoffs. Real MODE runtime/convergence and speedup remain unverified."
+}

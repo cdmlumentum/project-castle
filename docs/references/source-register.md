@@ -1,0 +1,18 @@
+# Simulation source register
+
+Record every reference used to make a workflow, model, data, or validation decision. Use a relative link for files in this project and a durable URL or access location for material stored elsewhere.
+
+| ID | Source and owner | Version or date | Location | Relevance to workflow | Status |
+| --- | --- | --- | --- | --- | --- |
+| REF-001 | Fully Adiabatic Design of Waveguide Branches; bibliographic details pending | As supplied | [PDF](Fully_Adiabatic_Design_of_Waveguide_Branches.pdf) | Original conversation reference; technical claims await content review | pending review |
+| REF-002 | Nonvolatile Liquid Controlled Adiabatic Silicon Photonics Switch; bibliographic details pending | As supplied | [PDF](Nonvolatile_Liquid_Controlled_Adiabatic_Silicon_Photonics_Switch.pdf) | Original conversation reference; technical claims await content review | pending review |
+| REF-003 | Broadband and Temperature Tolerant Silicon Nitride Liquid Controlled Waveguide Coupler; bibliographic details pending | As supplied | [PDF](Broadband_and_Temperature_Tolerant_Silicon_Nitride_Liquid_Controlled_Waveguide_Coupler.pdf) | Original conversation reference; technical claims await content review | pending review |
+| REF-004 | oe-26-16-19877; title and publisher pending | As supplied | [PDF](oe-26-16-19877.pdf) | Original conversation reference; technical claims await content review | pending review |
+| REF-005 | Vertical liquid adiabatic coupler workflow; user supplied Python package | v23 / 0.23.0 | [Import manifest](../legacy/v23-import.json) | Geometry, numerical algorithms and saved block contract used as the implementation baseline | current |
+| REF-006 | Endpoint propagation-constant plot; user supplied attachment | Received 2026-11-26 | `C:/Users/mos68521/Downloads/endpoint_betas_linear.pdf` | Block 1 two-panel beta-versus-position layout, signed detuning annotations and explicit linear interpolation between calculated endpoints; visual reference only, numeric values are not simulation inputs | current |
+| REF-007 | Ansys Lumerical field retrieval and project persistence documentation | Accessed 2026-11-26 | [getdata command](https://optics.ansys.com/hc/en-us/articles/360034409834-getdata-Script-command), [save command](https://optics.ansys.com/hc/en-us/articles/360034410814-save-Script-command) | MODE modal field retrieval and solved project persistence; new archives retain the existing selected normalized transverse Ex/Ey representation | current |
+| REF-006 | Ansys Optics: FDE solver simulation object | Accessed 2026-11-26 | [Official documentation](https://optics.ansys.com/hc/en-us/articles/360034916973-FDE-solver-Simulation-object) | Independent mesh/domain controls, PML and actual mesh considerations for Block 0 | current |
+| REF-007 | Ansys Optics: Tunable CROW filter, FDE settings | Accessed 2026-11-26 | [Official example](https://optics.ansys.com/hc/en-us/articles/360051107554-Tunable-CROW-Filter) | Mesh and domain convergence guidance | current |
+| REF-008 | Ansys Optics: addmesh | Accessed 2026-11-26 | [Official command](https://optics.ansys.com/hc/en-us/articles/360034924253-addmesh-Script-command) | Local override construction in the Python/native adapters | current |
+
+Use a short, stable ID such as `REF-001`. In **Relevance to workflow**, name the requirement, model assumption, input, interface, or validation case supported by the source. In **Status**, use `current`, `superseded`, or `pending review`.

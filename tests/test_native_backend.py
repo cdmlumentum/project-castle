@@ -1,0 +1,111 @@
+"""Native integration contracts; optical fixtures are synthetic, not device data."""
+
+from dataclasses import asdict, replace
+import json
+from pathlib import Path
+import tempfile
+import unittest
+from unittest.mock import patch
+
+import numpy as np
+from scipy.io import loadmat
+
+from test_efficiency import geometry, fixture_modes
+from test_python_pso import ROOT
+from vlac import cli
+from vlac.cache import SQLiteCache
+from vlac.config import load_config
+from vlac.materials import build_material_bank, material_samples
+from vlac.modes import extract_coupling
+from vlac.native_backend import NativeLumapiBackend, native_script
+from vlac.native_mode import prepare_bundle
+from vlac.profiles import evaluate_design_profiles
+
+
+class NativeBackendTests(unittest.TestCase):
+    def setUp(self):
+        self.config = load_config(ROOT / "config/default.json")
+
+    def adapter(self, folder=None):
+        backend = object.__new__(NativeLumapiBackend)
+        backend.config = self.config
+        backend.bank = build_material_bank(self.config)
+        backend.mesh_accuracy = self.config.solver.mesh_accuracy
+        backend.script_hash = "test_native_core"
+        backend.cache = SQLiteCache(Path(folder)/"native.sqlite") if folder else None
+        backend._build_domain()
+        return backend
+
+    def test_prepare_is_offline_and_embeds_exact_materials(self):
+        with tempfile.TemporaryDirectory() as folder, patch.object(NativeLumapiBackend, "__init__", side_effect=AssertionError("MODE must not launch")):
+            bundle = prepare_bundle(self.config, folder, width_samples=7)
+            values = loadmat(bundle/"native_config.mat", simplify_cells=True)["vlac_cfg"]
+            expected = material_samples(build_material_bank(self.config).sin, np.linspace(1.26e-6, 1.34e-6, 81))
+            np.testing.assert_array_equal(values["sin_table"], expected)
+            self.assertEqual(len(values["endpoint_widths_m"]), 7)
+            self.assertEqual(values["geometry"]["h_gap_m"], 1e-6)
+            for number in (1, 2, 3):
+                self.assertIn(f"vlac_block{number}", (bundle/f"block{number}.lsf").read_text())
+            entry = (bundle/'block1.lsf').read_text()
+            self.assertLess(entry.index('vlac_block1_inspection'),entry.index('save("block1.lms")'))
+            self.assertLess(entry.index('rm("block1_native.mat")'),entry.index('block1_native=vlac_block1'))
+            self.assertIn('result.mode_profiles=profiles', (bundle/'vlac_blocks.lsf').read_text())
+            manifest = json.loads((bundle/"manifest.json").read_text())
+            self.assertEqual(manifest["standalone_algorithms"]["block2"], "coordinate_pattern")
+            with self.assertRaises(FileExistsError):
+                prepare_bundle(self.config, folder)
+
+    def test_native_isolated_fresh_verification_bypasses_cache(self):
+        with tempfile.TemporaryDirectory() as folder:
+            backend = self.adapter(folder)
+            payload = {"mode": asdict(fixture_modes()[0]), "overlap": 1.}
+            with patch.object(backend, "_call_native", return_value=payload) as call:
+                for _ in range(2):
+                    backend.solve_isolated_mode(geometry(self.config), 1.3e-6, guide="upper")
+                self.assertEqual(call.call_count, 1)
+                backend.solve_isolated_mode(geometry(self.config), 1.3e-6, guide="upper", use_cache=False)
+                self.assertEqual(call.call_count, 2)
+
+    def test_sub_float_display_changes_do_not_collide_in_native_cache(self):
+        backend = self.adapter()
+        first = backend._cache_identity(geometry(self.config, width=1e-6), 1.3e-6)
+        second = backend._cache_identity(geometry(self.config, width=1e-6+1e-17), 1.3e-6)
+        # Existing cache serialization rounded arrays; native keys include exact values.
+        self.assertNotEqual(first, second)
+        before = backend._cache_identity(geometry(self.config), 1.3e-6)
+        backend.script_hash = "revised_native_core"
+        self.assertNotEqual(before, backend._cache_identity(geometry(self.config), 1.3e-6))
+
+    def test_profile_routes_whole_grid_to_native_backend(self):
+        backend = self.adapter()
+        marker = [[extract_coupling(4., 2., 5., 1.)]]
+        with patch.object(backend, "evaluate_profile_grid", return_value=marker) as run:
+            actual = evaluate_design_profiles(backend, self.config, backend.bank, None,
+                                               np.arange(4), np.arange(4), np.arange(3), np.arange(3), state="bar")
+        self.assertIs(actual, marker)
+        self.assertEqual(run.call_args.kwargs["state"], "bar")
+
+    def test_engine_selection_keeps_python_as_default(self):
+        self.assertEqual(self.config.solver.engine, "python")
+        with patch("vlac.cli.LumapiBackend", return_value="original"):
+            self.assertEqual(cli._backend(self.config), "original")
+        config = replace(self.config, solver=replace(self.config.solver, engine="native"))
+        with patch("vlac.native_backend.NativeLumapiBackend", return_value="native"):
+            self.assertEqual(cli._backend(config), "native")
+        with self.assertRaisesRegex(ValueError, "solver.engine"):
+            replace(self.config, solver=replace(self.config.solver, engine="invalid")).validate()
+
+    def test_standalone_optimizer_rejects_unsupported_fabrication_constraints(self):
+        config = replace(self.config, optimizer=replace(self.config.optimizer, maximum_slope_m_per_m=.01))
+        with tempfile.TemporaryDirectory() as folder, self.assertRaisesRegex(ValueError, "slope/curvature"):
+            prepare_bundle(config, folder)
+
+    def test_packaged_native_sources_define_all_three_blocks(self):
+        self.assertIn("function vlac_profile(", native_script("vlac_core.lsf"))
+        text = native_script("vlac_blocks.lsf")
+        for number in (1, 2, 3):
+            self.assertIn(f"function vlac_block{number}(", text)
+
+
+if __name__ == "__main__":
+    unittest.main()

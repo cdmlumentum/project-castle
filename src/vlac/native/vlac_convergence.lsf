@@ -1,0 +1,30 @@
+# Block 0 optical sample. No synthetic optical data or optimization is used.
+# The Python calibration driver owns budgets, restart checkpoints and certificates.
+function vlac_convergence_sample(cfg,request) {
+    result=struct; result.ok=0; result.error=""; result.flag="ok"; result.solves=0;
+    refs=struct; refs.n=0; refs.items=cell(1); refs.items{1}=0;
+    geometry=request.geometry; wavelength=request.wavelength_m;
+    if (request.kind=="isolated") {
+        guide_one=vlac_isolated(cfg,geometry,wavelength,"upper",refs,1);
+        if (!guide_one.ok) { result.error=guide_one.error; return result; }
+        lower_geometry=geometry;
+        if (cfg.endpoint_lower_state_independent) {
+            lower_geometry.liquid_index=interp(cfg.liquid_cross_n,cfg.liquid_wavelengths_m,wavelength);
+        }
+        guide_two=vlac_isolated(cfg,lower_geometry,wavelength,"lower",refs,1);
+        if (!guide_two.ok) { result.error=guide_two.error; return result; }
+        result.modes=cell(2); result.modes{1}=guide_one.mode; result.modes{2}=guide_two.mode;
+        result.solves=guide_one.attempts+guide_two.attempts;
+    } else {
+        calculated=vlac_coefficients(cfg,geometry,wavelength,refs,0,0);
+        if (!calculated.ok) { result.error=calculated.error; return result; }
+        reference=calculated.reference; result.modes=cell(4);
+        result.modes{1}=reference.upper; result.modes{2}=reference.lower;
+        result.modes{3}=reference.plus; result.modes{4}=reference.minus;
+        result.delta_beta=calculated.coefficients.delta_beta;
+        result.kappa=calculated.coefficients.kappa; result.flag=calculated.coefficients.extraction_flag;
+        result.solves=calculated.solves;
+    }
+    result.ok=1;
+    return result;
+}
