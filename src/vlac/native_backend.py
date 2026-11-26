@@ -52,9 +52,16 @@ def snapshot_from_native(value) -> ModeSnapshot:
     )
 
 
+def snapshot_to_native(value: ModeSnapshot):
+    """Preserve complex neff using the matrix type accepted by lumapi v221."""
+    payload = asdict(value)
+    payload["neff"] = np.array([[value.neff]], dtype=complex)
+    return payload
+
+
 def reference_to_native(value: ModeReference):
-    return {"upper": asdict(value.upper), "lower": asdict(value.lower),
-            "plus": asdict(value.supermodes[0]), "minus": asdict(value.supermodes[1])}
+    return {"upper": snapshot_to_native(value.upper), "lower": snapshot_to_native(value.lower),
+            "plus": snapshot_to_native(value.supermodes[0]), "minus": snapshot_to_native(value.supermodes[1])}
 
 
 def pack_references(references):
