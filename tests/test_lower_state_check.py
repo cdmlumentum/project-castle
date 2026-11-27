@@ -80,7 +80,7 @@ class LowerStateCheckTests(unittest.TestCase):
         g = self.config.geometry
         endpoint = SimpleNamespace(w1_input_m=1.1e-6, w1_output_m=1.8e-6,
             h_gap_m=1e-6, h_rib_m=175e-9, delta_beta_max_rad_per_m=5e4)
-        solution = SimpleNamespace(w1_control_m=np.linspace(1.1e-6, 1.8e-6, 4),
+        solution = SimpleNamespace(anchor_z_m=None, w1_control_m=np.linspace(1.1e-6, 1.8e-6, 4),
             d_c2c_control_m=np.linspace(g.d_c2c_input_m, g.d_c2c_output_m, 4))
         return endpoint, solution, None, {'block': 2, 'sha256': 'SYNTHETIC', 'validation': {'status': 'review'}}
 

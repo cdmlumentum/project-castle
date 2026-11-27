@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 from .block_io import write_json
 from .export import _coefficient_rows, _write_csv, plt
-from .geometry import ClampedCubicProfile
+from .geometry import solution_profiles
 
 FILES = ('block2_geometry.json', 'block2_geometry.csv', 'block2_target_comparison.json',
          'block2_target_comparison.csv', 'block2_target_comparison.png', 'block2_target_comparison.pdf')
@@ -45,8 +45,7 @@ def export_profile_diagnostics(output, config, endpoint, solution):
     out = Path(output)
     out.mkdir(parents=True,exist_ok=True)
     summary = comparison_summary(config,endpoint,solution)
-    w = ClampedCubicProfile(config.device.length_m,solution.w1_control_m)
-    dc = ClampedCubicProfile(config.device.length_m,solution.d_c2c_control_m)
+    w, dc = solution_profiles(config, solution)
     z = np.linspace(0,config.device.length_m,501)
     geometry = {'schema_version':1,'units':'SI: metres', 'profile_definition':'open-clamped cubic B-splines; coefficients are not sampled widths',
         'length_m':config.device.length_m,'lower_width_m':config.geometry.w1_lower_m,
@@ -59,6 +58,13 @@ def export_profile_diagnostics(output, config, endpoint, solution):
         'sampled_upper_width_range_m':[float(np.min(w(z))),float(np.max(w(z)))],
         'sampled_lateral_offset_range_m':[float(np.min(dc(z))),float(np.max(dc(z)))],
         'range_sampling_points':len(z)}
+    if solution.anchor_z_m is not None:
+        geometry.update(schema_version=2, profile_definition='PCHIP through exact geometry anchors',
+            anchor_z_m=solution.anchor_z_m.tolist(),
+            upper_width_anchors_m=solution.w1_control_m.tolist(),
+            lateral_offset_anchors_m=solution.d_c2c_control_m.tolist())
+        geometry.pop('upper_width_controls_m')
+        geometry.pop('lateral_offset_controls_m')
     write_json(out/FILES[0],geometry)
     rows = [{'z_m':float(zi),'upper_width_m':float(w(zi)),'lower_width_m':config.geometry.w1_lower_m,
              'lateral_offset_m':float(dc(zi)),'vertical_gap_m':endpoint.h_gap_m,

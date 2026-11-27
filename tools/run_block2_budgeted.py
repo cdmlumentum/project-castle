@@ -57,7 +57,7 @@ def main():
     record = {'status':'starting','started_utc':datetime.now(timezone.utc).isoformat(),
         'source_checkout':str(ROOT),'source_commit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
         'command':command,'maximum_wall_seconds':seconds,'completion_plan_seconds':plan_seconds,
-        'numerical_changes':'Measured-cost Powell work allocation only; endpoint geometry, mesh and tolerances preserved.',
+        'numerical_changes':'Measured-cost profile work allocation only; endpoint geometry, mesh and tolerances preserved.',
         'block0_certificate_applied':bool(config.solver.calibration),'supervisor_pid':os.getpid()}
     write_json(record_path,record)
     if os.name == 'nt':

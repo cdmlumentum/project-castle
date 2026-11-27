@@ -22,7 +22,7 @@ from scipy.interpolate import PchipInterpolator
 
 from .block0 import base_profiles, certified_profile, input_identity, installation_identity, margins
 from .block_io import digest, load_block, source_record, write_json
-from .geometry import ClampedCubicProfile, make_geometry
+from .geometry import profile_from_values, solution_profiles, make_geometry
 from .materials import build_material_bank
 from .modes import (ModeReference, ModeSnapshot, InvalidModeError, field_overlap,
                     select_mode, select_supermode_pair, extract_coupling)
@@ -140,9 +140,10 @@ def coefficient_pair(upper, lower, candidates, references, previous_kappa, confi
 
 def alignment_roots(config, solution):
     length = config.device.length_m
-    offset = ClampedCubicProfile(length, solution.d_c2c_control_m)
+    offset = profile_from_values(length, solution.d_c2c_control_m, solution.anchor_z_m)
     from scipy.interpolate import PPoly
-    roots = PPoly.from_spline(offset._spline).roots(extrapolate=False)*length
+    roots = (offset._spline.roots(extrapolate=False) if solution.anchor_z_m is not None
+             else PPoly.from_spline(offset._spline).roots(extrapolate=False)*length)
     return np.unique(roots[np.isfinite(roots) & (roots > 0) & (roots < length)])
 
 
@@ -374,8 +375,7 @@ def run_check(config, output, *, stage='screen', profile_dir=None, max_solves=12
 def _check_profile(run, config, endpoint, solution, geometry, lower, profile, limits):
     z = np.asarray(run.plan['z_m'])
     coarse = np.asarray(run.plan['coarse_z_m'])
-    w = ClampedCubicProfile(config.device.length_m, solution.w1_control_m)
-    d = ClampedCubicProfile(config.device.length_m, solution.d_c2c_control_m)
+    w, d = solution_profiles(config, solution)
     scale = endpoint.delta_beta_max_rad_per_m
     healthy, approximation_ok, midpoints_ok, propagation_ok = True, True, True, True
     for state in ('cross', 'bar'):

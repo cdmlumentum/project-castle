@@ -19,7 +19,7 @@ from .tracking import CandidateRejected, EndpointConsistencyError, require_ancho
 METHOD = 'sequential_width_offset_v1'
 
 
-def isolated_detuning_grid(backend, config, bank, endpoint, width_controls, z, wavelengths):
+def isolated_detuning_grid(backend, config, bank, endpoint, width_controls, z, wavelengths, *, width_samples=None):
     """Track isolated modes on the full production domain, with upper at x=0.
 
     No coupled solves or compact-domain substitutions are made in this stage.
@@ -27,7 +27,8 @@ def isolated_detuning_grid(backend, config, bank, endpoint, width_controls, z, w
     Lower modes are invariant with upper width in the current material map and
     are solved once per wavelength. Native raw caching handles further reuse.
     """
-    profile = ClampedCubicProfile(config.device.length_m, width_controls)
+    profile = (ClampedCubicProfile(config.device.length_m, width_controls) if width_samples is None
+               else lambda position: np.interp(position, z, width_samples))
     previous_lambda = [None] * len(z)
     grid = []
     for wavelength in wavelengths:

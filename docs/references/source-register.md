@@ -33,3 +33,12 @@ Use a short, stable ID such as `REF-001`. In **Relevance to workflow**, name the
   Basis representation and derivative API. The ordered-coefficient guarantee
   follows from nonnegative lower-degree derivative basis functions; the new
   parameterization does not replace the cubic spline or its knots.
+
+## Sweep anchors (v0.27.0, 2026-11-27)
+
+- REF-015: [SciPy PchipInterpolator](https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.PchipInterpolator.html).
+  Shape-preserving interpolation through specified anchors; C1 continuity, with
+  potentially discontinuous second derivatives. Used only for geometry interpolation.
+- REF-002 and REF-004 motivate sequential width/detuning then separation/coupling
+  design. The finite-grid minimax path, table checks and PCHIP representation are
+  explicitly named project alternatives, not algorithms claimed from those papers.

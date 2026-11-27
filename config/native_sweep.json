@@ -1,0 +1,23 @@
+{
+  "materials": {
+    "silicon_data_csv": "data/green_si_2008_1260_1340.csv"
+  },
+  "solver": {
+    "engine": "native",
+    "hide_gui": true,
+    "tracking_method": "guarded_translation_v1",
+    "tracking_recovery_depth": 3,
+    "endpoint_domain_policy": "strict"
+  },
+  "optimizer": {
+    "method": "sweep_anchored_v1",
+    "sweep_width_samples": 17,
+    "sweep_offset_samples": 17,
+    "sweep_samples_max": 65,
+    "sweep_interpolation_subdivisions": 8
+  },
+  "output": {
+    "directory": "outputs/native_sweep",
+    "cache_sqlite": "outputs/native_sweep/cache/native_fde_cache.sqlite"
+  }
+}

@@ -189,3 +189,55 @@ def blackman_theta(z_m: float | np.ndarray, length_m: float) -> np.ndarray:
         - 0.5952 * np.sin(2 * np.pi * u)
         + 0.0476 * np.sin(4 * np.pi * u)
     )
+
+
+class AnchoredProfile:
+    """Shape-preserving interpolation through measured-design anchors in SI."""
+    def __init__(self, length_m, z_m, values):
+        from scipy.interpolate import PchipInterpolator
+        self.length_m = float(length_m)
+        self.z_m = np.asarray(z_m, dtype=float)
+        self.values = np.asarray(values, dtype=float)
+        if (self.z_m.ndim != 1 or self.values.shape != self.z_m.shape or len(self.z_m) < 3
+                or not np.all(np.isfinite(self.z_m)) or not np.all(np.isfinite(self.values))
+                or np.any(np.diff(self.z_m) <= 0)
+                or not np.allclose(self.z_m[[0,-1]], [0., self.length_m], rtol=0, atol=1e-15)):
+            raise ValueError('Invalid PCHIP anchor coordinates or values.')
+        self._spline = PchipInterpolator(self.z_m, self.values, extrapolate=False)
+
+    def __call__(self, z_m):
+        z = np.asarray(z_m, dtype=float)
+        if np.any(~np.isfinite(z)) or np.any((z < 0) | (z > self.length_m)):
+            raise ValueError('Anchor profile queried outside 0 <= z <= L.')
+        result = np.asarray(self._spline(z))
+        low, high = float(np.min(self.values)), float(np.max(self.values))
+        tolerance = 32*np.finfo(float).eps*max(abs(low),abs(high),1e-300)
+        if np.any(result<low-tolerance) or np.any(result>high+tolerance):
+            raise ValueError('PCHIP unexpectedly exceeded its anchor range.')
+        result = np.clip(result,low,high)  # roundoff only; PCHIP cannot overshoot in exact arithmetic
+        for coordinate,value in zip(self.z_m,self.values):
+            result = np.where(z==coordinate,value,result)
+        return result
+
+    def derivative(self, z_m, order=1):
+        return np.asarray(self._spline.derivative(order)(z_m))
+
+    def max_abs_derivative(self, order):
+        # Include both sides of knots: PCHIP second derivatives can jump.
+        maximum = 0.
+        for i, h in enumerate(np.diff(self.z_m)):
+            polynomial = np.polyder(self._spline.c[:,i], order)
+            roots = np.roots(np.polyder(polynomial))
+            points = [0., h]+[float(r.real) for r in roots if abs(r.imag)<1e-14 and 0<r.real<h]
+            maximum = max(maximum, float(np.max(np.abs(np.polyval(polynomial, points)))))
+        return maximum
+
+
+def profile_from_values(length_m, values, anchor_z_m=None):
+    return (ClampedCubicProfile(length_m, values) if anchor_z_m is None
+            else AnchoredProfile(length_m, anchor_z_m, values))
+
+
+def solution_profiles(config, solution):
+    return tuple(profile_from_values(config.device.length_m, values, solution.anchor_z_m)
+                 for values in (solution.w1_control_m, solution.d_c2c_control_m))

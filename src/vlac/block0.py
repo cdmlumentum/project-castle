@@ -25,7 +25,7 @@ import numpy as np
 from scipy.io import savemat
 
 from .block_io import clean, digest, write_json
-from .geometry import ClampedCubicProfile, make_geometry
+from .geometry import solution_profiles, make_geometry
 from .materials import build_material_bank
 
 SCHEMA = 1
@@ -806,8 +806,7 @@ def verify_design(config, output, endpoint, solution=None, *, bar=None, evaluato
         points = list(zip(widths, offsets))
     else:
         z = np.unique(np.r_[solution.z_m, (solution.z_m[:-1]+solution.z_m[1:])/2])
-        wp = ClampedCubicProfile(config.device.length_m, solution.w1_control_m)
-        dp = ClampedCubicProfile(config.device.length_m, solution.d_c2c_control_m)
+        wp, dp = solution_profiles(config, solution)
         points = list(zip(wp(z), dp(z)))
         wavelengths = ([config.device.wavelength_min_m,config.device.wavelength_max_m] if endpoint_wavelengths_only else
                        np.unique(np.r_[solution.wavelengths_m, (config.device.wavelength_min_m+config.device.wavelength_max_m)/2]))

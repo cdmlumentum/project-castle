@@ -351,6 +351,7 @@ def _run_index_sensitivity(config, endpoint, solution, output, cache_path, *, pr
                     solution.d_c2c_control_m,
                     solution.z_m,
                     solution.wavelengths_m,
+                    anchor_z_m=solution.anchor_z_m,
                     state=state,
                 )
                 metrics = propagate_state(
@@ -508,8 +509,12 @@ def _main(argv: list[str] | None = None) -> int:
             _add_solver_runtime_args(stage)
             if number==2:
                 stage.add_argument("--complete-within-seconds",type=float,default=None,
-                                   help="Plan Powell work from measured costs, reserving final grid checks and exports.")
-                stage.add_argument("--max-evaluations",type=int,default=None,help="Override per-grid optimizer evaluation budget.")
+                                   help="Plan profile work from measured costs, reserving final grid checks and exports.")
+                stage.add_argument("--max-evaluations",type=int,default=None,help="Powell only: override per-grid optimizer evaluation budget.")
+                for axis in ('width','offset'):
+                    stage.add_argument('--sweep-'+axis+'-samples',type=int,default=None,
+                                       help='Initial linear sweep sample count for sweep_anchored_v1.')
+                stage.add_argument('--sweep-samples-max',type=int,default=None,help='Maximum samples per sweep axis.')
                 stage.add_argument("--max-refinements",type=int,default=None,help="Override profile grid refinement budget.")
             if number==4:
                 stage.add_argument("--rk4-steps-initial",type=int,default=None)
@@ -640,9 +645,15 @@ def _main(argv: list[str] | None = None) -> int:
             config = _apply_runtime_overrides(load_config(args.config),api_path=args.api_path,hide_gui=args.hide_gui,platform=args.platform,block0_dir=args.block0_dir)
             config = _execution_overrides(config, _execution_args(args), args.characterize)
             if number==2:
+                if config.optimizer.method == 'sweep_anchored_v1' and args.max_evaluations is not None:
+                    raise ValueError('Sweep fitting uses --sweep-width-samples/--sweep-offset-samples and solve/time budgets, not --max-evaluations.')
+                sweep_overrides = {name:getattr(args,name) for name in ('sweep_width_samples','sweep_offset_samples','sweep_samples_max') if getattr(args,name) is not None}
+                if sweep_overrides and config.optimizer.method != 'sweep_anchored_v1':
+                    raise ValueError('Sweep sample overrides require sweep_anchored_v1.')
                 updates = {key:value for key,value in (("max_function_evaluations_per_grid",args.max_evaluations),
                                                       ("complete_within_seconds",args.complete_within_seconds),
                                                       ("max_grid_refinements",args.max_refinements)) if value is not None}
+                updates.update(sweep_overrides)
                 config = replace(config,optimizer=replace(config.optimizer,**updates))
             if number==4:
                 updates = {key:value for key,value in (("rk4_steps_initial",args.rk4_steps_initial),("rk4_steps_max",args.rk4_steps_max),

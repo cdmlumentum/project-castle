@@ -20,7 +20,7 @@ from .endpoint_constraints import require_endpoint_constraints
 from .modes import Coefficients
 from .profiles import ProfileSolution, target_profiles
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 4
 MODEL = 'full_width_slabs_v21;negative_to_positive_cross_target'
 COMPLEX_FIELDS = {'beta_upper','beta_lower','beta_plus','beta_minus','delta_beta','delta_pm','delta_12','kappa'}
 OPTIONAL_FLOATS = {'kappa_profile_check','overlap_upper_lower'}
@@ -140,6 +140,8 @@ def decode_solution(raw):
     values = dict(raw)
     for key in ('w1_control_m','d_c2c_control_m','z_m','wavelengths_m','delta_target_rad_per_m','kappa_target_rad_per_m'):
         values[key] = np.asarray(values[key],dtype=float)
+    if values.get('anchor_z_m') is not None:
+        values['anchor_z_m'] = np.asarray(values['anchor_z_m'],dtype=float)
     values['cross_coefficients'] = decode_coefficients(values['cross_coefficients'])
     return ProfileSolution(**values)
 
@@ -196,6 +198,13 @@ def validate_grid(grid, solution, config):
 
 
 def validate_solution(solution, endpoint, config):
+    anchored = solution.profile_kind == 'pchip_anchors_v1'
+    if solution.profile_kind not in {'pchip_anchors_v1', 'clamped_cubic_v1'}:
+        raise ValueError('Unsupported profile representation.')
+    if anchored != (solution.anchor_z_m is not None) or anchored != (config.optimizer.method == 'sweep_anchored_v1'):
+        raise ValueError('Profile representation does not match its method/anchor coordinates.')
+    from .geometry import solution_profiles
+    width_profile, offset_profile = solution_profiles(config, solution)
     for values, minimum in ((solution.z_m,3),(solution.wavelengths_m,2)):
         if values.ndim!=1 or len(values)<minimum or not np.all(np.isfinite(values)) or np.any(np.diff(values)<=0):
             raise ValueError(f'Saved grid coordinates must be finite, increasing 1D arrays with at least {minimum} points.')
@@ -204,10 +213,10 @@ def validate_solution(solution, endpoint, config):
     g = config.geometry
     for values,bounds,ends in ((solution.w1_control_m,(g.w1_min_m,g.w1_max_m),(endpoint.w1_input_m,endpoint.w1_output_m)),
                               (solution.d_c2c_control_m,g.d_c2c_bounds_m,(g.d_c2c_input_m,g.d_c2c_output_m))):
-        if values.ndim!=1 or len(values)<4 or not np.all(np.isfinite(values)) or np.any(values<bounds[0]-1e-15) or np.any(values>bounds[1]+1e-15):
+        if values.ndim!=1 or len(values)<(3 if anchored else 4) or not np.all(np.isfinite(values)) or np.any(values<bounds[0]-1e-15) or np.any(values>bounds[1]+1e-15):
             raise ValueError('Saved profile controls are invalid or outside bounds.')
         if not np.allclose(values[[0,-1]],ends,rtol=0,atol=1e-15): raise ValueError('Saved profile endpoint controls changed.')
-        if config.optimizer.method in {'monotone_powell','sequential_width_offset_v1'}:
+        if config.optimizer.method in {'monotone_powell','sequential_width_offset_v1','sweep_anchored_v1'}:
             from .monotone import is_monotone
             if not is_monotone(values):
                 raise ValueError('Saved profile violates monotone control ordering.')
@@ -217,12 +226,10 @@ def validate_solution(solution, endpoint, config):
     if not np.isfinite(solution.objective) or solution.objective<0: raise ValueError('Saved profile objective is invalid.')
     from .profiles import minimax_objective
     from .optimize import _check_fabrication_constraints
-    from .geometry import ClampedCubicProfile
     actual_objective = minimax_objective(solution.cross_coefficients,solution.z_m,config.device.length_m,endpoint.delta_beta_max_rad_per_m)[0]
     if not np.isclose(solution.objective,actual_objective,rtol=1e-9,atol=1e-7):
         raise ValueError('Saved objective does not match its coefficient grid.')
-    if _check_fabrication_constraints(config,ClampedCubicProfile(config.device.length_m,solution.w1_control_m),
-                                     ClampedCubicProfile(config.device.length_m,solution.d_c2c_control_m)):
+    if _check_fabrication_constraints(config,width_profile,offset_profile):
         raise ValueError('Saved profiles violate the current slope/curvature constraints.')
     quality = validate_grid(solution.cross_coefficients,solution,config)
     if config.solver.tracking_method == 'guarded_translation_v1':
@@ -264,7 +271,7 @@ def write_artifact(output, block, config, endpoint, *, solution=None, bar=None, 
 
 def _read_artifact(path, block, config):
     artifact = json.loads(path.read_text(encoding='utf-8'))
-    if artifact.get('schema_version') not in {1,SCHEMA_VERSION} or artifact.get('block')!=block or artifact.get('status')!='complete':
+    if artifact.get('schema_version') not in {1,2,SCHEMA_VERSION} or artifact.get('block')!=block or artifact.get('status')!='complete':
         raise ValueError('Unsupported, incomplete, or wrong-block artifact: '+str(path))
     expected = artifact.pop('sha256',None)
     if expected!=digest(artifact): raise ValueError('Saved artifact checksum mismatch: '+str(path))
@@ -278,6 +285,8 @@ def _read_artifact(path, block, config):
     solution = None
     bar = None
     if block>=2:
+        if artifact['schema_version'] < 4 and artifact['payload']['solution'].get('anchor_z_m') is not None:
+            raise ValueError('Anchor geometry requires schema 4.')
         solution = decode_solution(artifact['payload']['solution'])
         validate_solution(solution,endpoint,config)
         if artifact['schema_version'] >= 2 and artifact['payload'].get('geometry') != geometry_data(config, endpoint, solution):
@@ -355,4 +364,6 @@ def geometry_data(config, endpoint, solution):
              'w1_control_m': clean(solution.w1_control_m), 'd_c2c_control_m': clean(solution.d_c2c_control_m),
              'h_gap_m': endpoint.h_gap_m, 'h_rib_m': endpoint.h_rib_m,
              'geometry': clean(config.as_dict()['geometry'])}
+    if solution.anchor_z_m is not None:
+        value.update(schema_version=2, profile_kind=solution.profile_kind, anchor_z_m=clean(solution.anchor_z_m))
     return dict(value, geometry_id=digest(value))

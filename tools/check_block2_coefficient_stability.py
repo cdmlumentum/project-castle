@@ -23,7 +23,7 @@ sys.path.insert(0,str(ROOT/'src'))
 from vlac.block_io import load_block, decode_solution, write_json
 from vlac.config import load_config
 from vlac.coefficient_stability import compare_coefficients
-from vlac.geometry import ClampedCubicProfile, make_geometry
+from vlac.geometry import profile_from_values, make_geometry
 from vlac.native_backend import NativeLumapiBackend
 from vlac.progress import ProgressReporter
 from vlac.runtime import BudgetExceeded
@@ -53,15 +53,16 @@ class DiagnosticCache:
 def frozen_profiles(config,endpoint,pilot):
     if (pilot/'block2_result.json').is_file():
         _,solution,_,_=load_block(pilot,2,config)
-        return solution.w1_control_m,solution.d_c2c_control_m,'completed pilot geometry'
+        return solution.w1_control_m,solution.d_c2c_control_m,solution.anchor_z_m,'completed pilot geometry'
     candidates=list((pilot/'.attempts').glob('*/block2_best_candidate.json'))
     if candidates:
         path=max(candidates,key=lambda p:p.stat().st_mtime_ns)
         solution=decode_solution(json.loads(path.read_text())['solution'])
-        return solution.w1_control_m,solution.d_c2c_control_m,'best valid pilot candidate (unpublished)'
+        return solution.w1_control_m,solution.d_c2c_control_m,solution.anchor_z_m,'best valid pilot candidate (unpublished)'
     n=config.optimizer.control_points
     return (np.linspace(endpoint.w1_input_m,endpoint.w1_output_m,n),
             np.linspace(config.geometry.d_c2c_input_m,config.geometry.d_c2c_output_m,n),
+            None,
             'initial monotone geometry; no valid pilot candidate was published')
 
 
@@ -80,9 +81,9 @@ def main():
     cfg.execution.native_batch_size=1
     cfg.execution.resume=False
     endpoint,_,_,_=load_block(args.endpoint_dir,1,cfg)
-    wc,dc,geometry_source=frozen_profiles(cfg,endpoint,args.pilot_dir)
-    wp=ClampedCubicProfile(cfg.device.length_m,wc)
-    dp=ClampedCubicProfile(cfg.device.length_m,dc)
+    wc,dc,anchor_z,geometry_source=frozen_profiles(cfg,endpoint,args.pilot_dir)
+    wp=profile_from_values(cfg.device.length_m,wc,anchor_z)
+    dp=profile_from_values(cfg.device.length_m,dc,anchor_z)
     center=brentq(lambda u:float(dp(u*cfg.device.length_m)),0,1,xtol=1e-13)*cfg.device.length_m
     positions=[cfg.device.length_m,center]
     cases=[(float(wavelength),float(z)) for wavelength in endpoint.wavelengths_m for z in positions]
@@ -94,6 +95,7 @@ def main():
         'source_identity':artifact_identity(cfg),'script_sha256':file_digest(__file__),
         'comparison_helper_sha256':file_digest(ROOT/'src/vlac/coefficient_stability.py'),
         'status':'running','geometry_source':geometry_source,'w_control_m':wc,'d_control_m':dc,
+        'anchor_z_m':anchor_z,'profile_kind':'pchip_anchors_v1' if anchor_z is not None else 'clamped_cubic_v1',
         'positions_m':positions,'settings':settings,'max_fde_solves':60,'max_seconds':2700,
         'production_mesh_and_domain_changed':False,
         'acceptance':asdict(cfg.convergence),'records':[],'comparisons':[],

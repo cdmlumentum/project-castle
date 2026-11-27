@@ -143,6 +143,10 @@ class ConvergenceConfig:
 class OptimizerConfig:
     method: str = "bounded_powell"
     complete_within_seconds: float | None = None
+    sweep_width_samples: int = 17
+    sweep_offset_samples: int = 17
+    sweep_samples_max: int = 65
+    sweep_interpolation_subdivisions: int = 8
     control_points: int = 6
     max_function_evaluations_per_grid: int = 120
     max_grid_refinements: int = 2
@@ -308,15 +312,31 @@ class WorkflowConfig:
             raise ValueError("The common field-overlap grid is too small.")
         if o.control_points < 4:
             raise ValueError("Use at least four spline control points per profile.")
-        if o.method not in {'bounded_powell','monotone_powell','sequential_width_offset_v1'}:
-            raise ValueError('optimizer.method must be bounded_powell, monotone_powell or sequential_width_offset_v1.')
-        if o.method == 'sequential_width_offset_v1':
+        if o.method not in {'bounded_powell','monotone_powell','sequential_width_offset_v1','sweep_anchored_v1'}:
+            raise ValueError('optimizer.method must be bounded_powell, monotone_powell, sequential_width_offset_v1 or sweep_anchored_v1.')
+        if o.method in {'sequential_width_offset_v1','sweep_anchored_v1'}:
             if s.tracking_method != 'guarded_translation_v1' or s.engine != 'native':
-                raise ValueError('sequential_width_offset_v1 requires guarded native mode tracking.')
-            if o.max_function_evaluations_per_grid < 2:
+                raise ValueError('Sequential/sweep fitting requires guarded native mode tracking.')
+            if o.method == 'sequential_width_offset_v1' and o.max_function_evaluations_per_grid < 2:
                 raise ValueError('Sequential fitting needs at least two evaluations per grid, one for each stage.')
             if not g.d_c2c_bounds_m[0] <= 0 <= g.d_c2c_bounds_m[1]:
                 raise ValueError('Sequential isolated width fitting requires x=0 inside the offset bounds.')
+        if o.method == 'sweep_anchored_v1':
+            for name in ('sweep_width_samples','sweep_offset_samples','sweep_samples_max'):
+                value = getattr(o,name)
+                if isinstance(value,bool) or not isinstance(value,int) or not 3 <= value <= 257:
+                    raise ValueError('Sweep sample counts must be integers between 3 and 257.')
+            if max(o.sweep_width_samples,o.sweep_offset_samples)>o.sweep_samples_max:
+                raise ValueError('Initial sweep count exceeds sweep_samples_max.')
+            import numpy as np
+            offsets = np.linspace(g.d_c2c_input_m,g.d_c2c_output_m,o.sweep_offset_samples)
+            if offsets.min() <= 0 <= offsets.max() and len(np.unique(np.r_[offsets,0.])) > o.sweep_samples_max:
+                raise ValueError('Offset sweep including the aligned sample exceeds sweep_samples_max.')
+            subdivisions = o.sweep_interpolation_subdivisions
+            if isinstance(subdivisions,bool) or not isinstance(subdivisions,int) or not 1 <= subdivisions <= 32:
+                raise ValueError('Sweep interpolation subdivisions must be an integer from 1 to 32.')
+            if s.endpoint_domain_policy != 'strict':
+                raise ValueError('Sweep anchors require strict endpoint checks.')
         if s.tracking_method not in {'legacy','guarded_translation_v1'}:
             raise ValueError('Unknown tracking method.')
         if s.tracking_method != 'legacy' and s.engine != 'native':

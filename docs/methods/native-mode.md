@@ -12,29 +12,32 @@ For certified transverse domains and meshes, see [Block 0 convergence](block0-co
 
 | Execution choice | Endpoint search | Profile optimization | FDE and coefficient processing |
 | --- | --- | --- | --- |
-| Default package (`config/default.json`, `config/native.json`, or no `--config`) | v23 adaptive search or configured Python alternative | Sequential width then offset Powell | Guarded native MODE tracking and raw FDE batches |
+| Default package (`config/default.json`, `config/native.json`, or no `--config`) | v23 adaptive search or configured Python alternative | Linear width then signed-offset sweeps; exact PCHIP anchors | Guarded native MODE tracking and raw FDE batches |
 | Explicit `config/python_joint.json` | Same v23 algorithms | Joint bounded Powell | Original Python adapter calling MODE |
 | Explicit `config/native_joint.json` | Same v23 algorithms | Joint bounded Powell | Native raw batches, selectors and extraction; Python traverses tracked grids |
 | Standalone MODE bundle | Explicit sampled-width pair search | Explicit bounded coordinate pattern search | Native LSF |
 
 The native standalone algorithms are alternatives to the adaptive search and Powell optimizer. A sampled-width result is the best feasible directly sampled pair; it does not claim search convergence or a global optimum. The coordinate pattern search terminates when its normalized step becomes sufficiently small or its evaluation budget is exhausted. A budget-limited result needs review.
 
-The native package adapter writes schema 2 and reads older compatible handoffs. It caches raw candidates, tracked coefficients and complete matching grids. Python traverses z/wavelength samples in the established tracking order; missing raw solves are sent to MODE in bounded batches. This adds raw-field transfer/storage costs while avoiding repeated eigensolves across grids. See [the v26 execution guide](workflow-runtime.md) for budgets, checkpoints and retained characterization.
+The package writes block handoff schema 4 and reads compatible schemas 1 and 2. Schema 4 records the profile representation and independent anchor coordinates; experimental schema 3 is not accepted. It caches raw candidates, tracked coefficients and complete matching grids. Python traverses z/wavelength samples in the established tracking order; missing raw solves are sent to MODE in bounded batches. This adds raw-field transfer/storage costs while avoiding repeated eigensolves across grids. See [the v26 execution guide](workflow-runtime.md) for budgets, checkpoints and retained characterization.
 
 The initial local comparison took approximately 75 versus 94 seconds for the Python/native cross-state sample and 98 versus 108 seconds for the bar-state sample. These are single samples under the current machine load. Keep Powell in Python and profile the repeated solve/cache boundary before making a speed-driven migration decision.
 
 ## Run this checkout
 
-The default `block2` and `validate-block2` commands use separate width-to-detuning
-and offset-to-coupling fits. `config/default.json`, `config/native.json` and
-`config/native_sequential.json` select the named `sequential_width_offset_v1`
-method with the native FDE backend and
-guarded tracking; see [v0.26.4](../changes/v26_4.md) for stage budgets, endpoint-wavelength-only validation and the remaining
-coefficient-extraction blocker.
-The standalone native bundle does not implement this method.
+The default `block2` and `validate-block2` commands use `sweep_anchored_v1`:
+linear isolated-width sweeps, frozen width anchors, then signed-offset sweeps
+at each selected width. `config/default.json`, `config/native.json` and
+`config/native_sweep.json` select this method with guarded native FDE tracking.
+See [the sweep method](sweep-anchored.md) for its algorithm, budgets, runtime
+estimate and validation scope. `config/native_sequential.json` retains the
+[v0.26.4 sequential Powell method](../changes/v26_4.md). The standalone native
+bundle implements neither sequential method.
 
-Block 2 exports `block2_geometry.json` (fixed dimensions and exact cubic spline
-controls), a dense geometry CSV, and `block2_target_comparison.{json,csv,png,pdf}`.
+Block 2 exports `block2_geometry.json` (fixed dimensions and exact geometry
+anchors for the default method, spline controls for legacy methods), a dense
+geometry CSV, and `block2_target_comparison.{json,csv,png,pdf}`. Sweep runs also
+export `block2_sweep_report.json` containing the sampled optical tables.
 The comparison uses Δβ = βupper − βlower, targets −D cos(θ) and (D/2) sin(θ),
 and the full complex κ residual. Absolute upper/lower β values are included in
 the CSV; the workflow imposes a target on their difference. The JSON reports
@@ -44,7 +47,7 @@ samples are for display; dense analytic targets do not imply dense FDE sampling.
 
 For an eight-hour completion plan, use `block2 --complete-within-seconds 27000
 --max-seconds 28800` with the ordinary endpoint/config/output arguments. The
-explicit alternative `bounded_powell_time_planned` measures the slowest completed
+Powell planning path records `bounded_powell_time_planned` and measures the slowest completed
 grid per-sample cost and reserves a fresh midpoint grid, another evaluation's
 margin, and 15 minutes for exports/cleanup, using a 1.5 timing factor. It ends
 optional Powell work and defers further refinement when that reserve is needed;
@@ -53,7 +56,7 @@ Block 2 handoff with honest convergence flags. It never coarsens the optical
 mesh, changes the endpoints, or loosens tolerances. `--max-seconds` remains a
 last-resort execution guard, not the scheduling mechanism. Solver stalls,
 license loss, or large timing changes cannot be guaranteed to fit an estimate.
-Each improved feasible evaluation also saves a candidate JSON in the current
+The sweep method uses the same measured-cost reserve to decide whether to start another refinement; its first full sweep and direct checks are mandatory. Completed tables/rows are checkpointed. For Powell methods, each improved feasible evaluation also saves a candidate JSON in the current
 attempt. Candidates are explicitly incomplete and cannot serve as block handoffs.
 
 Run these commands from the repository root. The launchers select the local source instead of any other installed `vlac` package.
@@ -65,7 +68,7 @@ python tools/run_vlac.py block3 --config config/native.json --profile-dir output
 python tools/run_vlac.py block4 --config config/native.json --bar-dir outputs/native_bar --out outputs/native_propagation
 ```
 
-These are production commands and can require many FDE solves. A completed compatible endpoint or profile directory can be supplied directly, including an existing v23 result. A Block 2 smoke execution can limit work using `--max-evaluations 2 --max-refinements 0`; its status will commonly be `review`.
+These are production commands and can require many FDE solves. A completed compatible endpoint or profile directory can be supplied directly, including an existing v23 result. A sweep smoke execution can limit work using `--sweep-width-samples 5 --sweep-offset-samples 5 --max-refinements 0 --max-solves 200 --max-seconds 3600`; its status may be `review` or fail if the hard budget is exhausted. `--max-evaluations` applies only to Powell methods. Use a separate output directory for each study.
 
 The supplied default and native configurations both select `solver.engine=native`. The explicit `config/python_joint.json` retains the Python backend; omitted fields in saved/custom configurations retain their historical defaults. GUI visibility, API path and thread settings retain their original configuration behavior. The provided native configuration hides newly launched MODE sessions and uses a separate cache file.
 
@@ -95,7 +98,7 @@ python tools/run_vlac.py native prepare --config config/native_joint.json --endp
 python tools/run_vlac.py native prepare --config config/native_joint.json --profile-dir outputs/native_joint_profile --out outputs/native_from_profile
 ```
 
-The first command seeds the native Block 1 handoff. The second requires a compatible joint-Powell profile, seeds both Blocks 1 and 2, and allows direct execution of `block3.lsf`. A sequential profile cannot be relabeled as a standalone joint result.
+The first command seeds the native Block 1 handoff. The second requires a compatible joint-Powell profile, seeds both Blocks 1 and 2, and allows direct execution of `block3.lsf`. A sequential or sweep-anchored profile cannot be relabeled as a standalone joint result.
 
 ## Run or import through Python
 

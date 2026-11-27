@@ -423,8 +423,11 @@ class NativeLumapiBackend(LumapiBackend):
         enforce_endpoint_report(report,self.config)
         return report
 
-    def evaluate_profile_grid(self, config, bank, endpoint, w_control, d_control, z, wavelengths, *, state, progress=None):
+    def evaluate_profile_grid(self, config, bank, endpoint, w_control, d_control, z, wavelengths, *, state, progress=None, anchor_z_m=None):
         request = profile_request(endpoint, w_control, d_control, z, wavelengths, state)
+        if anchor_z_m is not None:
+            request["anchor_z_m"] = np.asarray(anchor_z_m).tolist()
+            request["profile_kind"] = "pchip_anchors_v1"
         key = stable_key({"native_grid": self.script_hash, "provenance": optical_identity(self.config), "config": self.native_config(),
                           "tracking_method":config.solver.tracking_method,"recovery_depth":config.solver.tracking_recovery_depth,
                           "endpoint_domain_policy":config.solver.endpoint_domain_policy,
@@ -435,7 +438,7 @@ class NativeLumapiBackend(LumapiBackend):
                 return cached
         from .profiles import _profile_coefficients
         result = _profile_coefficients(self, config, bank, endpoint, w_control, d_control, z, wavelengths,
-                                       state=state, progress=progress)
+                                       state=state, progress=progress, anchor_z_m=anchor_z_m)
         if self.cache:
             self.cache.put(key, result, kind="native_profile_grid")
         return result

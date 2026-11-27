@@ -136,10 +136,10 @@ class SequentialTests(unittest.TestCase):
         self.assertAlmostEqual(result.objective,expected)
         self.assertEqual(result.grid_convergence_history[-1]['wavelength_check'],'band_edges_only_no_interior_check')
 
-    def test_standard_configs_execute_width_then_offset_by_default(self):
+    def test_explicit_sequential_config_executes_width_then_offset(self):
         from vlac.cli import DEFAULT_CONFIG
         self.assertEqual(DEFAULT_CONFIG.resolve(), (ROOT/'config/default.json').resolve())
-        for name in ('default.json', 'native.json'):
+        for name in ('native_sequential.json',):
             with self.subTest(config=name):
                 self.config = load_config(ROOT/'config'/name)
                 self.config.optimizer.max_function_evaluations_per_grid = 6

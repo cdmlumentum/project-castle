@@ -34,6 +34,13 @@ def _check_fabrication_constraints(
     dense_z = np.linspace(0, config.device.length_m, 401)
     penalty = 0.0
     for profile in (w, d):
+        if hasattr(profile, 'max_abs_derivative'):
+            for order, limit in ((1,limit_slope),(2,limit_curvature)):
+                if limit is not None:
+                    violation = profile.max_abs_derivative(order)-limit
+                    if violation > 0:
+                        penalty += 1e3+violation/max(limit,1e-30)
+            continue
         if limit_slope is not None:
             violation = np.maximum(np.abs(profile.derivative(dense_z)) - limit_slope, 0)
             if np.any(violation):
@@ -68,7 +75,10 @@ def _axis_validation_errors(base, checked, coordinates, refined, axis, delta_sca
 
 
 def optimize_profiles(backend, config: WorkflowConfig, bank: MaterialBank, endpoint: EndpointSearchResult, *, progress=None, checkpoint_dir=None):
-    """Joint or sequential Powell, with fresh coefficient midpoint checks."""
+    """Named profile construction methods with fresh coefficient midpoint checks."""
+    if config.optimizer.method == 'sweep_anchored_v1':
+        from .sweep_anchored import optimize_sweep
+        return optimize_sweep(backend,config,bank,endpoint,progress=progress,checkpoint_dir=checkpoint_dir)
     g, d, o = config.geometry, config.device, config.optimizer
     sequential = o.method == 'sequential_width_offset_v1'
     if config.solver.tracking_method == 'guarded_translation_v1':

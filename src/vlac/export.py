@@ -17,7 +17,7 @@ import numpy as np
 from .config import WorkflowConfig, save_config
 from .endpoint import EndpointSearchResult
 from .endpoint_constraints import require_cross_state_signs, require_endpoint_constraints
-from .geometry import ClampedCubicProfile, blackman_theta
+from .geometry import solution_profiles, blackman_theta
 from .materials import MaterialBank, material_report
 from .modes import Coefficients
 from .profiles import ProfileSolution, target_profiles
@@ -51,8 +51,7 @@ def _coefficient_rows(
     config: WorkflowConfig,
 ) -> list[dict]:
     rows = []
-    w_profile = ClampedCubicProfile(config.device.length_m, solution.w1_control_m)
-    d_profile = ClampedCubicProfile(config.device.length_m, solution.d_c2c_control_m)
+    w_profile, d_profile = solution_profiles(config, solution)
     for state, grid in (
         ("cross", solution.cross_coefficients),
         ("bar", bar_coefficients),
@@ -154,8 +153,7 @@ def _plot_profiles(
     axes[0, 1].set(title="Coupling coefficient", xlabel="z (µm)", ylabel="Re(κ) (rad/m)")
     axes[0, 0].legend(fontsize=7, ncol=2)
     axes[0, 1].legend(fontsize=7, ncol=2)
-    w = ClampedCubicProfile(config.device.length_m, solution.w1_control_m)
-    dc = ClampedCubicProfile(config.device.length_m, solution.d_c2c_control_m)
+    w, dc = solution_profiles(config, solution)
     dense_z = np.linspace(0, config.device.length_m, 501)
     axes[1, 0].plot(dense_z * 1e6, w(dense_z) * 1e6, color="tab:blue")
     axes[1, 0].set(title="Upper-guide width", xlabel="z (µm)", ylabel="w1 (µm)")
@@ -231,8 +229,7 @@ def export_run(
         endpoint.candidate_records,
     )
 
-    w_profile = ClampedCubicProfile(config.device.length_m, solution.w1_control_m)
-    dc_profile = ClampedCubicProfile(config.device.length_m, solution.d_c2c_control_m)
+    w_profile, dc_profile = solution_profiles(config, solution)
     theta = blackman_theta(solution.z_m, config.device.length_m)
     _write_csv(
         out / "optimized_profiles.csv",

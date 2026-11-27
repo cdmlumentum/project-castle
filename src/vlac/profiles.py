@@ -7,7 +7,7 @@ import numpy as np
 
 from .config import WorkflowConfig
 from .endpoint import EndpointSearchResult
-from .geometry import ClampedCubicProfile, blackman_theta, make_geometry
+from .geometry import profile_from_values, blackman_theta, make_geometry
 from .materials import MaterialBank
 from .modes import Coefficients, ModeReference
 
@@ -25,6 +25,9 @@ class ProfileSolution:
     optimizer_history: list[dict]
     grid_convergence_history: list[dict]
     grid_converged: bool
+    profile_kind: str = "clamped_cubic_v1"
+    anchor_z_m: np.ndarray | None = None
+    sweep_report: dict | None = None
 
 
 def target_profiles(z_m: np.ndarray, length_m: float, delta_beta_max: float):
@@ -46,11 +49,12 @@ def _profile_coefficients(
     *,
     state: str,
     progress=None,
+    anchor_z_m=None,
 ) -> list[list[Coefficients]]:
     g, d = config.geometry, config.device
     guarded = config.solver.tracking_method == 'guarded_translation_v1'
-    w_profile = ClampedCubicProfile(d.length_m, w_control_m)
-    dc_profile = ClampedCubicProfile(d.length_m, d_control_m)
+    w_profile = profile_from_values(d.length_m, w_control_m, anchor_z_m)
+    dc_profile = profile_from_values(d.length_m, d_control_m, anchor_z_m)
     liquid = bank.liquid_cross if state == "cross" else bank.liquid_bar
     all_coeffs: list[list[Coefficients]] = []
     previous_lambda_references: list[ModeReference | None] = [None] * len(z_m)
@@ -155,11 +159,13 @@ def evaluate_design_profiles(
     *,
     state: str = "cross",
     progress=None,
+    anchor_z_m=None,
 ) -> list[list[Coefficients]]:
     if hasattr(backend, "evaluate_profile_grid"):
         return backend.evaluate_profile_grid(
             config, bank, endpoint, w_control_m, d_control_m, z_m, wavelengths_m,
             state=state, progress=progress,
+            **({"anchor_z_m": anchor_z_m} if anchor_z_m is not None else {}),
         )
     return _profile_coefficients(
         backend,
@@ -172,4 +178,5 @@ def evaluate_design_profiles(
         wavelengths_m,
         state=state,
         progress=progress,
+        anchor_z_m=anchor_z_m,
     )

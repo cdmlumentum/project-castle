@@ -56,7 +56,7 @@ def characterize_profile(backend, config, bank, endpoint, solution, *, progress=
     grids = saved['grids'] if saved else None
     def evaluate(zz, ww):
         return {state: evaluate_design_profiles(backend, config, bank, endpoint,
-                solution.w1_control_m, solution.d_c2c_control_m, zz, ww, state=state, progress=progress)
+                solution.w1_control_m, solution.d_c2c_control_m, zz, ww, state=state, progress=progress, anchor_z_m=solution.anchor_z_m)
                 for state in ('cross', 'bar')}
     if grids is None:
         grids = evaluate(z, wavelengths)

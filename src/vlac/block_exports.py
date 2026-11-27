@@ -3,13 +3,16 @@ from pathlib import Path
 
 from .block_io import write_json
 from .export import _coefficient_rows, _plot_profiles, _write_csv
-from .geometry import ClampedCubicProfile, blackman_theta
+from .geometry import solution_profiles, blackman_theta
 
 
 def export_profiles(output, config, endpoint, solution, bar=None):
     out = Path(output)
-    w = ClampedCubicProfile(config.device.length_m,solution.w1_control_m)
-    d = ClampedCubicProfile(config.device.length_m,solution.d_c2c_control_m)
+    if solution.sweep_report is not None:
+        write_json(out/'block2_sweep_report.json',solution.sweep_report)
+    else:
+        (out/'block2_sweep_report.json').unlink(missing_ok=True)
+    w, d = solution_profiles(config, solution)
     theta = blackman_theta(solution.z_m,config.device.length_m)
     rows = [{'z_m':z,'z_um':z*1e6,'theta_rad':theta[i],'w1_m':float(w(z)),'w1_um':float(w(z)*1e6),
              'd_c2c_m':float(d(z)),'d_c2c_um':float(d(z)*1e6),'h_gap_m':endpoint.h_gap_m,'h_rib_m':endpoint.h_rib_m,

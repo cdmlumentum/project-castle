@@ -78,7 +78,7 @@ def run(config, source, specification, output, backend_factory):
                 with backend_factory(varied, cache_path=resolved_cache(config)) as backend:
                     backend.budget = budget
                     for state in ('cross','bar'):
-                        grid = evaluate_design_profiles(backend,varied,bank,ep,widths,offsets,solution.z_m,solution.wavelengths_m,state=state)
+                        grid = evaluate_design_profiles(backend,varied,bank,ep,widths,offsets,solution.z_m,solution.wavelengths_m,state=state,anchor_z_m=solution.anchor_z_m)
                         quality[state] = validate_grid(grid,solution,varied)
                         result.extend(propagate_state(solution.z_m,grid,solution.wavelengths_m,state=state,settings=config.propagation))
                 saved = {'case': case, 'performance': result, 'quality': quality,

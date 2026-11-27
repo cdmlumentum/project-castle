@@ -89,13 +89,16 @@ def profile_report(solution,endpoint,config):
             'coefficient_quality':quality,'objective_achieved':solution.objective,
             'target_fit_acceptance_threshold':None,
             'optimizer_method':config.optimizer.method,
+            'profile_kind':solution.profile_kind,
+            'sweep_stages':solution.optimizer_history if config.optimizer.method=='sweep_anchored_v1' else None,
             'sequential_stages':([{'width':h['width_stage'],
                 'offset_objective':h['offset_objective'],'offset_success':h['offset_success'],
                 'width_frozen_during_offset_fit':h['width_frozen_during_offset_fit']}
                 for h in solution.optimizer_history] if sequential else None),
             'exploratory_only':config.solver.endpoint_domain_policy=='warn_exploratory',
             'endpoint_domain_policy':config.solver.endpoint_domain_policy,
-            'scope':('sequential isolated-width and coupled-offset fits with z midpoint checks at the band edges' if sequential else
+            'scope':('linear optical sweeps, finite candidate minimax paths and direct anchor/z checks at the band edges' if config.optimizer.method=='sweep_anchored_v1' else
+                     'sequential isolated-width and coupled-offset fits with z midpoint checks at the band edges' if sequential else
                      'cross-state profile optimization and z coefficient interpolation checks at the band edges'
                      if edges_only else 'cross-state profile optimization on the saved wavelength grid'),
             'wavelength_validation':('band edges only; interior wavelengths not checked in Block 2'
@@ -143,7 +146,7 @@ def check_bar_grid(backend,config,bank,endpoint,solution,bar,*,progress=None):
         if progress:
             progress.start_stage(f'Bar-state {name} grid validation',unit='fixed-profile FDE checks')
         checked = evaluate_design_profiles(backend,config,bank,endpoint,solution.w1_control_m,solution.d_c2c_control_m,
-            refined if name=='z' else solution.z_m,refined if name=='wavelength' else solution.wavelengths_m,state='bar')
+            refined if name=='z' else solution.z_m,refined if name=='wavelength' else solution.wavelengths_m,state='bar',anchor_z_m=solution.anchor_z_m)
         errors[name] = _axis_validation_errors(bar,checked,current,refined,axis,endpoint.delta_beta_max_rad_per_m)
         quality = validate_grid(checked,replace(solution,
             z_m=refined if name=='z' else solution.z_m,
@@ -161,7 +164,7 @@ def check_bar_grid(backend,config,bank,endpoint,solution,bar,*,progress=None):
 def run_bar(backend,config,bank,endpoint,solution,output,*,progress=None,source=None):
     require_endpoint_wavelengths(solution,config)
     bar = evaluate_design_profiles(backend,config,bank,endpoint,solution.w1_control_m,solution.d_c2c_control_m,
-                                  solution.z_m,solution.wavelengths_m,state='bar',progress=progress)
+                                  solution.z_m,solution.wavelengths_m,state='bar',progress=progress,anchor_z_m=solution.anchor_z_m)
     quality = validate_grid(bar,solution,config)
     characterization = None
     if config.characterization.enabled:

@@ -97,7 +97,11 @@
     "engine": "native"
   },
   "optimizer": {
-    "method": "sequential_width_offset_v1",
+    "method": "sweep_anchored_v1",
+    "sweep_width_samples": 17,
+    "sweep_offset_samples": 17,
+    "sweep_samples_max": 65,
+    "sweep_interpolation_subdivisions": 8,
     "control_points": 6,
     "max_function_evaluations_per_grid": 120,
     "max_grid_refinements": 2,
