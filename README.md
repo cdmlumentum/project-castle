@@ -6,6 +6,10 @@ This checkout includes local MODE integration and an optional native Lumerical s
 
 Use `python tools/run_vlac.py ...` to run this checkout explicitly; another `vlac` package may already be installed on this computer. `python tools/run_tests.py` likewise selects this checkout. Installation with `python -m pip install -e .` makes the `vlac` and `vlac-native` entry points available in the selected Python environment.
 
+[v0.26.6](docs/changes/v26_6.md) adds the shared-grid mesh diagnostic and the
+user-selected `neff_kappa_only_v1` acceptance policy: index error `1e-4`, no
+independent detuning mesh/domain gate, and unchanged complex-coupling limits.
+
 `config/default.json` retains the original Python calculation path. `config/native.json` selects native LSF mode selection, coefficient extraction with reusable raw eigenproblem samples, while retaining the adaptive endpoint search, SciPy Powell optimizer and saved block format. Original reference files are in [docs/references](docs/references/README.md).
 
 `config/native_sequential.json` selects the [v0.26.4 sequential alternative](docs/changes/v26_4.md):

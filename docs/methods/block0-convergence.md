@@ -37,17 +37,29 @@ All applicable limits must pass against the reference.
 
 | Quantity | Default |
 | --- | --- |
-| Absolute real effective-index change | `2e-5` |
+| Absolute real effective-index change | `1e-4` |
 | Normalized transverse E-field overlap squared | at least `0.999` |
 | TE-like fraction change | at most `0.01`; both modes must also meet the existing minimum TE fraction |
-| Complex detuning/coupling error | at most `2 rad/m + 0.01 * abs(reference)` |
-| Detuning/coupling error times device length | at most `0.02 rad` |
+| Complex coupling error | at most `2 rad/m + 0.01 * abs(reference)` |
+| Coupling error times device length | at most `0.02 rad` |
+| Detuning error | reported only; no independent acceptance threshold |
 | Modal attenuation change over device length | at most `0.01 dB` |
 | Overlap change on a nested every-other-point grid | at most `(1 - minimum_power_overlap) / 5` |
 
 The overlap is a transverse E-field similarity measure, not a full E/H power-flux integral. A dense fixed physical comparison grid is retained for each solve family, including certified production calculations. Fields outside their solver grid are zero, so cropping is visible. A pair-subspace singular-value comparison handles rotations of nearly degenerate modes; propagation constants and coupling still need to pass. Complex beta, upper-minus-lower detuning and the existing coupling branch convention are preserved.
 
-The absolute coefficient floor avoids division by zero. At 1.5 mm length, the phase limit corresponds to about `13.3 rad/m`, potentially stricter than the 1% coefficient criterion. These numerical limits can be reviewed when device performance targets are defined. They do not guarantee insertion loss or crosstalk.
+The user selected the named accuracy policy `neff_kappa_only_v1` on November 27,
+2026: effective-index limits are `1e-4`, and detuning absolute/relative and
+accumulated-error thresholds no longer gate mesh/domain acceptance. Detuning
+remains a finite diagnostic output and Blackman fit target. This does not remove
+longitudinal/table interpolation checks or the versioned handoff's arithmetic,
+endpoint-sign and mode-validity checks. Solver mesh/domain and endpoint index
+checks use the same `1e-4` default. Historical results retain their saved limits;
+changed accuracy/input/source identities invalidate old calibration certificates.
+
+The absolute coupling floor avoids division by zero. At 1.5 mm length, its
+phase limit corresponds to about `13.3 rad/m`, potentially stricter than the 1%
+coupling criterion. These limits do not guarantee insertion loss or crosstalk.
 
 ## Profiles and production handoffs
 

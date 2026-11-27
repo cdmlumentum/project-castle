@@ -2,6 +2,10 @@
 
 The Python package supports a native Lumerical script calculation core and standalone MODE entry points for Blocks 1, 2 and 3. The calculation core preserves the v23 cross-section geometry, sampled material tables, transverse-field normalization, mode selection, detuning sign and complex coupling extraction. Implementation parity is checked separately from mesh convergence and physical device performance.
 
+For a separate diagnostic using shared actual grids and the two endpoint
+wavelengths, see [targeted mesh study](targeted-mesh-study.md). It does not
+change production reference definitions or issue a Block 0 certificate.
+
 ## Execution choices
 
 For certified transverse domains and meshes, see [Block 0 convergence](block0-convergence.md). `native prepare --block0-dir ...` embeds its passed profiles and certificate ID. Calibration/native profile settings have offline contract coverage; use a passed full certificate from the intended installed solver before production handoff.

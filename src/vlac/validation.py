@@ -392,7 +392,6 @@ def validate_endpoint_isolated_domain(
     passed = (
         max_upper_change <= tolerance
         and max_lower_change <= tolerance
-        and max_delta_change <= 2 * tolerance
         and max_translation_change <= tolerance
     )
     if progress:
@@ -413,6 +412,7 @@ def validate_endpoint_isolated_domain(
         "maximum_upper_neff_change": float(max_upper_change),
         "maximum_lower_neff_change": float(max_lower_change),
         "maximum_delta_beta_change_as_neff": float(max_delta_change),
+        "delta_beta_acceptance_enforced": False,
         "maximum_full_domain_translation_change_as_neff": float(
             max_translation_change
         ),

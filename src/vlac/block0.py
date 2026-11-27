@@ -239,10 +239,13 @@ def compare_saved_coefficients(config, saved, reference):
             if key == 'kappa' and abs(-a-b) < abs(a-b):
                 a = -a
             error = abs(a-b)
-            passed &= bool(np.isfinite(error) and error <= c.coefficient_atol_rad_per_m+c.coefficient_rtol*abs(b)
-                           and error*length <= c.phase_error_rad)
+            passed &= bool(np.isfinite(error))
+            if key == 'kappa':
+                passed &= bool(error <= c.coefficient_atol_rad_per_m+c.coefficient_rtol*abs(b)
+                               and error*length <= c.phase_error_rad)
             metrics[key+'_error_rad_per_m'] = error
-    return {'passed': bool(passed), 'scope': 'stored_scalar_coefficients', **metrics}
+    return {'passed': bool(passed), 'scope': 'stored_scalar_coefficients',
+            'acceptance_policy': c.acceptance_policy, 'delta_beta_acceptance_enforced': False, **metrics}
 
 
 def compare_samples(config, actual, reference):
@@ -280,7 +283,11 @@ def compare_samples(config, actual, reference):
         phase = error*length
         errors[key+'_error_rad_per_m'] = float(error)
         errors[key+'_phase_error_rad'] = float(phase)
-        coefficients_pass &= error <= allowed and phase <= c.phase_error_rad
+        # Detuning changes remain diagnostic outputs. Individual modal indices
+        # and loss are checked above; only kappa has an independent error gate.
+        coefficients_pass &= np.isfinite(error)
+        if key == 'kappa':
+            coefficients_pass &= error <= allowed and phase <= c.phase_error_rad
     flags_ok = actual.get('flag', 'ok') == reference.get('flag', 'ok') == 'ok'
     polarization_valid = min(actual['te'].min(), reference['te'].min()) >= config.solver.minimum_te_fraction
     passed = (finite and flags_ok and polarization_valid and neff_error <= c.neff_atol and loss_error <= c.loss_error_db
@@ -288,6 +295,7 @@ def compare_samples(config, actual, reference):
               and subspace >= c.minimum_power_overlap and coefficients_pass
               and aliasing_error <= (1-c.minimum_power_overlap)/5)
     return {'passed': bool(passed), 'finite': bool(finite), 'flags_ok': flags_ok,
+            'acceptance_policy': c.acceptance_policy, 'delta_beta_acceptance_enforced': False,
             'polarization_valid': bool(polarization_valid),
             'minimum_te_fraction': float(min(actual['te'].min(), reference['te'].min())),
             'maximum_real_neff_error': neff_error, 'maximum_loss_error_db': loss_error,

@@ -220,11 +220,14 @@ class NativeLumapiBackend(LumapiBackend):
     def _raw_key(self, request, mesh_accuracy=None):
         geometry = dict(request['geometry'])
         geometry.pop('state', None)  # Optical identity is the actual liquid index.
-        if not request['upper']:
+        # A shared diagnostic mesh retains boxes at BOTH ridge locations.
+        # Removed-ridge dimensions therefore still affect the actual grid.
+        shared_mesh = bool(self.native_config(mesh_accuracy).get('diagnostic_shared_mesh', False))
+        if not request['upper'] and not shared_mesh:
             geometry.pop('w1_m', None); geometry.pop('d_c2c_m', None)
         elif request['compact']:
             geometry['d_c2c_m'] = 0.0
-        if not request['lower']: geometry.pop('w2_m', None)
+        if not request['lower'] and not shared_mesh: geometry.pop('w2_m', None)
         cfg = self.native_config(mesh_accuracy)
         for key in ('geometry','minimum_te_fraction','minimum_mode_overlap','field_overlap_crosscheck_max_basis_overlap',
                     'endpoint_lower_state_independent','length_m','liquid_cross_n','liquid_bar_n'):

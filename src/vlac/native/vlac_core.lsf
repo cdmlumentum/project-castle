@@ -87,6 +87,7 @@ function vlac_raw(cfg,geometry,wavelength,upper_enabled,lower_enabled,compact) {
             mesh_name="vlac_local_"+num2str(old_mesh);
             if (getnamednumber(mesh_name)>0) { select(mesh_name); delete; }
         }
+        if (getnamednumber("vlac_coupling_mesh")>0) { select("vlac_coupling_mesh"); delete; }
         silica="SiO2_Malitson_1965"; nitride="Si3N4_Luke_2015_provisional";
         if (!materialexists(silica)) { vlac_material(silica,cfg.silica_table,cfg.material_fit_max_coefficients); }
         if (!materialexists(nitride)) { vlac_material(nitride,cfg.sin_table,cfg.material_fit_max_coefficients); }
@@ -123,10 +124,31 @@ function vlac_raw(cfg,geometry,wavelength,upper_enabled,lower_enabled,compact) {
                 for (guide_index=1:2) {
                     active=lower_enabled; center_x=0; center_y=geometry.h_wg_m/2; guide_width=geometry.w2_m;
                     if (guide_index==2) { active=upper_enabled; center_x=upper_x; center_y=upper_y+geometry.h_wg_m/2; guide_width=geometry.w1_m; }
+                    if (isfield(cfg,"diagnostic_shared_mesh")) {
+                        if (cfg.diagnostic_shared_mesh) { active=1; }
+                    }
                     if (active) {
                         addmesh; set("name","vlac_local_"+num2str(guide_index));
                         set("x",center_x); set("x span",guide_width+2*numerical.local_padding_m);
                         set("y",center_y); set("y span",geometry.h_wg_m+2*numerical.local_padding_m);
+                        set("z",0); set("z span",1e-6);
+                        set("override x mesh",numerical.local_dx_m>0);
+                        set("override y mesh",numerical.local_dy_m>0); set("override z mesh",0);
+                        set("set maximum mesh step",1);
+                        if (numerical.local_dx_m>0) { set("dx",numerical.local_dx_m); }
+                        if (numerical.local_dy_m>0) { set("dy",numerical.local_dy_m); }
+                    }
+                }
+                if (isfield(cfg,"diagnostic_shared_mesh")) {
+                    if (cfg.diagnostic_shared_mesh) {
+                        # Resolve both slabs AND the evanescent coupling region.
+                        # Bounds depend on complete geometry, never ridge enable flags.
+                        left=min([-geometry.w2_m/2,upper_x-geometry.w1_m/2])-numerical.local_padding_m;
+                        right=max([geometry.w2_m/2,upper_x+geometry.w1_m/2])+numerical.local_padding_m;
+                        addmesh; set("name","vlac_coupling_mesh");
+                        set("x",(left+right)/2); set("x span",right-left);
+                        set("y",(upper_y+geometry.h_wg_m)/2);
+                        set("y span",upper_y+geometry.h_wg_m+2*numerical.local_padding_m);
                         set("z",0); set("z span",1e-6);
                         set("override x mesh",numerical.local_dx_m>0);
                         set("override y mesh",numerical.local_dy_m>0); set("override z mesh",0);
@@ -167,6 +189,9 @@ function vlac_raw(cfg,geometry,wavelength,upper_enabled,lower_enabled,compact) {
                     mesh_info.maximum_dx_m=max(x(2:length(x))-x(1:(length(x)-1)));
                     mesh_info.minimum_dy_m=min(y(2:length(y))-y(1:(length(y)-1)));
                     mesh_info.maximum_dy_m=max(y(2:length(y))-y(1:(length(y)-1)));
+                    if (isfield(cfg,"diagnostic_record_mesh")) {
+                        if (cfg.diagnostic_record_mesh) { mesh_info.x_m=x; mesh_info.y_m=y; }
+                    }
                     snapshot.mesh=mesh_info;
                     snapshot.neff=getdata(card,"neff");
                     snapshot.ex=ex/field_norm; snapshot.ey=ey/field_norm;

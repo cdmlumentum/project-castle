@@ -66,7 +66,12 @@ The PML settings are actually `convergence.pml_layers` and that value plus `pml_
 
 Every case must pass A-B and B-C for x mesh, C-D and D-E for y mesh, E-F and F-G for lateral span, G-H for the joint guard, H-I for PML, **and A-I directly** to bound accumulated error. All comparisons use one common physical field grid per family. Samples are saved once and reused for comparisons; tracking/complex coupling comparison follows the existing Block 0 code.
 
-The existing `neff_atol`, complex detuning/coupling absolute-plus-relative and phase-error limits, modal attenuation, TE fraction, field/pair-subspace overlap, and comparison-grid aliasing checks all remain active. A failed comparison produces failure, not an automatically relaxed tolerance or a claim that a different candidate converged.
+The selected `neff_kappa_only_v1` accuracy policy uses `neff_atol=1e-4` and keeps
+complex coupling absolute-plus-relative and phase-error limits, modal attenuation,
+TE fraction, field/pair-subspace overlap, and comparison-grid aliasing checks.
+Detuning errors are reported without an independent acceptance threshold. A failed
+comparison produces failure, not an automatically relaxed tolerance or a claim
+that a different candidate converged.
 
 The reduction omits vertical-domain convergence, the full geometry and interior-wavelength envelope, an adaptive phase-matching scan, a search for the fastest settings, and independent timing replicates. It establishes neither longitudinal interpolation convergence nor physical device IL/XT. The reserve is available for configured retries; no optional hidden optical work consumes it.
 

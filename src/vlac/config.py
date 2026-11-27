@@ -108,8 +108,8 @@ class SolverConfig:
     endpoint_domain_policy: str = "strict"
     field_overlap_crosscheck_max_basis_overlap: float = 0.95
     large_separation_check_m: float = 7e-6
-    mesh_convergence_neff_tolerance: float = 2e-5
-    domain_convergence_neff_tolerance: float = 2e-5
+    mesh_convergence_neff_tolerance: float = 1e-4
+    domain_convergence_neff_tolerance: float = 1e-4
     coefficient_convergence_relative_tolerance: float = 0.05
     # A complete, self-contained Block 0 certificate; absent in legacy configs.
     calibration: dict | None = None
@@ -118,13 +118,14 @@ class SolverConfig:
 
 @dataclass
 class ConvergenceConfig:
+    acceptance_policy: str = 'neff_kappa_only_v1'
     max_solves: int = 1200
     max_seconds: float = 21600.0
     reference_domain_factors: list[float] = field(default_factory=lambda: [1., 1.25, 1.5, 1.75])
     reference_mesh_factors: list[float] = field(default_factory=lambda: [1., .75, .5, .375])
     candidate_margin_factors: list[float] = field(default_factory=lambda: [1., .75, .5])
     candidate_mesh_factors: list[float] = field(default_factory=lambda: [1., 1.25, 1.5])
-    neff_atol: float = 2e-5
+    neff_atol: float = 1e-4
     coefficient_rtol: float = .01
     coefficient_atol_rad_per_m: float = 2.0
     phase_error_rad: float = .02
@@ -404,6 +405,8 @@ class WorkflowConfig:
         if not (0 < p.xt_power_floor < 1):
             raise ValueError("XT power floor must lie between zero and one.")
         c = self.convergence
+        if c.acceptance_policy != 'neff_kappa_only_v1':
+            raise ValueError('Unknown convergence.acceptance_policy.')
         for name in ('max_solves', 'timing_repeats', 'reference_sentinels', 'pml_layers', 'pml_test_extra_layers'):
             value = getattr(c, name)
             if isinstance(value, bool) or not isinstance(value, int) or value < 1:

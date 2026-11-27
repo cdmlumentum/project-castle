@@ -167,14 +167,41 @@ class BlockZeroTests(unittest.TestCase):
             with self.subTest(updates=updates), self.assertRaises(ValueError):
                 replace(self.config, convergence=replace(self.config.convergence, **updates)).validate()
 
-    def test_metrics_detect_phase_error_despite_small_neff_error(self):
+    def test_detuning_error_is_reported_without_an_independent_acceptance_gate(self):
         reference, actual = self.sample(), self.sample()
         actual['neff'][0] += 3e-6
         actual['delta_beta'] += 30.
         result = b0.compare_samples(self.config, actual, reference)
         self.assertLess(result['maximum_real_neff_error'], self.config.convergence.neff_atol)
         self.assertGreater(result['delta_beta_phase_error_rad'], self.config.convergence.phase_error_rad)
+        self.assertTrue(result['passed'])
+        self.assertFalse(result['delta_beta_acceptance_enforced'])
+
+    def test_neff_limit_is_one_e_minus_four_and_coupling_phase_gate_remains(self):
+        self.assertEqual(self.config.convergence.neff_atol,1e-4)
+        reference, actual = self.sample(), self.sample()
+        actual['neff'][0] += 9e-5
+        actual['delta_beta'] += 9e-5*2*np.pi/actual['wavelength_m']
+        self.assertTrue(b0.compare_samples(self.config,actual,reference)['passed'])
+        actual['neff'][0] += 2e-5
+        self.assertFalse(b0.compare_samples(self.config,actual,reference)['passed'])
+        reference, actual = self.sample(), self.sample()
+        reference['kappa'],actual['kappa'] = 1e4,1e4+30
+        result = b0.compare_samples(self.config,actual,reference)
+        self.assertGreater(result['kappa_phase_error_rad'],self.config.convergence.phase_error_rad)
         self.assertFalse(result['passed'])
+
+    def test_saved_detuning_error_does_not_gate_but_kappa_error_does(self):
+        reference = self.sample()
+        factor = 2*np.pi/reference['wavelength_m']
+        saved = {key:factor*reference['neff'][i] for i,key in enumerate(
+            ('beta_upper','beta_lower','beta_plus','beta_minus'))}
+        saved.update(delta_beta=reference['delta_beta']+1000,kappa=reference['kappa'])
+        result = b0.compare_saved_coefficients(self.config,saved,reference)
+        self.assertTrue(result['passed'])
+        self.assertEqual(result['delta_beta_error_rad_per_m'],1000)
+        saved['kappa'] += 30
+        self.assertFalse(b0.compare_saved_coefficients(self.config,saved,reference)['passed'])
 
     def test_near_zero_coupling_uses_absolute_and_phase_limits(self):
         reference = self.sample(); reference['kappa'] = 0j
