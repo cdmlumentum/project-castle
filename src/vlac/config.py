@@ -103,6 +103,8 @@ class SolverConfig:
     tracking_grid_ny: int = 72
     minimum_te_fraction: float = 0.45
     minimum_mode_overlap: float = 0.55
+    tracking_method: str = "legacy"
+    tracking_recovery_depth: int = 3
     field_overlap_crosscheck_max_basis_overlap: float = 0.95
     large_separation_check_m: float = 7e-6
     mesh_convergence_neff_tolerance: float = 2e-5
@@ -305,6 +307,14 @@ class WorkflowConfig:
             raise ValueError("The common field-overlap grid is too small.")
         if o.control_points < 4:
             raise ValueError("Use at least four spline control points per profile.")
+        if o.method not in {'bounded_powell','monotone_powell'}:
+            raise ValueError('optimizer.method must be bounded_powell or monotone_powell.')
+        if s.tracking_method not in {'legacy','guarded_translation_v1'}:
+            raise ValueError('Unknown tracking method.')
+        if s.tracking_method != 'legacy' and s.engine != 'native':
+            raise ValueError('guarded_translation_v1 currently requires the native raw FDE backend.')
+        if isinstance(s.tracking_recovery_depth,bool) or not isinstance(s.tracking_recovery_depth,int) or not 0<=s.tracking_recovery_depth<=5:
+            raise ValueError('tracking_recovery_depth must be an integer from 0 to 5.')
         if e.method not in {"adaptive_1d", "python_grid", "python_pso"}:
             raise ValueError("endpoint_search.method must be adaptive_1d, python_grid or python_pso.")
         if e.method == "adaptive_1d" and not s.endpoint_compact_x:

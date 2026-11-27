@@ -1,0 +1,157 @@
+{
+  "endpoints": [
+    {
+      "block1_neff": 1.7371611956144235,
+      "block2_selected_neff": 1.7371436659051436,
+      "candidates": [
+        {
+          "anchor_overlap": 0.9999874324560972,
+          "core_fraction": 0.7378394132993299,
+          "identity": "mode1@1.737143666",
+          "te_fraction": 0.9990618622978632
+        },
+        {
+          "anchor_overlap": 0.00022601117326830067,
+          "core_fraction": 0.5707086270368541,
+          "identity": "mode2@1.664462347",
+          "te_fraction": 0.030026923229491395
+        },
+        {
+          "anchor_overlap": 8.380582564176035e-05,
+          "core_fraction": 0.23668421356416794,
+          "identity": "mode3@1.644149692",
+          "te_fraction": 0.9770172426224722
+        },
+        {
+          "anchor_overlap": 0.0007312392736787626,
+          "core_fraction": 0.000376365848998018,
+          "identity": "mode4@1.636532814",
+          "te_fraction": 0.9999801651987479
+        },
+        {
+          "anchor_overlap": 0.0015756786777744625,
+          "core_fraction": 0.0012157922226295613,
+          "identity": "mode5@1.635629743",
+          "te_fraction": 0.9999403111682806
+        },
+        {
+          "anchor_overlap": 0.0027004100628644444,
+          "core_fraction": 0.0018569860943062422,
+          "identity": "mode6@1.634150233",
+          "te_fraction": 0.9999202633422054
+        },
+        {
+          "anchor_overlap": 0.004619387569570377,
+          "core_fraction": 0.001444414736874023,
+          "identity": "mode7@1.632161811",
+          "te_fraction": 0.9999599174502712
+        },
+        {
+          "anchor_overlap": 0.007679826915124392,
+          "core_fraction": 0.007109068488545613,
+          "identity": "mode8@1.630262394",
+          "te_fraction": 0.9997775400052241
+        }
+      ],
+      "end": "input",
+      "field_source": "targeted fresh FDE reconstruction at original settings",
+      "full_domain_anchor_neff": 1.7371436659051436,
+      "geometry": {
+        "box_thickness_m": 3e-06,
+        "d_c2c_m": -8e-06,
+        "h_gap_m": 1e-06,
+        "h_rib_m": 1.75e-07,
+        "h_wg_m": 3.5e-07,
+        "liquid_index": 1.55,
+        "state": "cross",
+        "w1_m": 1.1346474562587244e-06,
+        "w2_m": 2e-06
+      },
+      "recovered_anchor_overlap": 0.9999874324560972,
+      "recovered_core_fraction": 0.7378394132993299,
+      "recovered_neff_error": 1.7529709279928696e-05,
+      "selected_anchor_overlap": 0.9999874324560972,
+      "selected_core_fraction": 0.7378394132993299,
+      "wavelength_m": 1.26e-06
+    },
+    {
+      "block1_neff": 1.7593204670871034,
+      "block2_selected_neff": 1.6363406793496662,
+      "candidates": [
+        {
+          "anchor_overlap": 0.9999991976420358,
+          "core_fraction": 0.8147118363206254,
+          "identity": "mode1@1.759346064",
+          "te_fraction": 0.9996928216744643
+        },
+        {
+          "anchor_overlap": 8.505440254129212e-05,
+          "core_fraction": 0.6729990566114908,
+          "identity": "mode2@1.701097068",
+          "te_fraction": 0.9921626736375562
+        },
+        {
+          "anchor_overlap": 4.026345975106645e-05,
+          "core_fraction": 0.633350929904652,
+          "identity": "mode3@1.682736557",
+          "te_fraction": 0.009295555840086707
+        },
+        {
+          "anchor_overlap": 0.012766879634012126,
+          "core_fraction": 0.0777861032865662,
+          "identity": "mode4@1.636847497",
+          "te_fraction": 0.973682341153449
+        },
+        {
+          "anchor_overlap": 0.00906616360218026,
+          "core_fraction": 0.041216968674376554,
+          "identity": "mode5@1.636340679",
+          "te_fraction": 0.9846650400036334
+        },
+        {
+          "anchor_overlap": 0.007437100386313008,
+          "core_fraction": 0.031184156373244037,
+          "identity": "mode6@1.635345009",
+          "te_fraction": 0.9859168394027261
+        },
+        {
+          "anchor_overlap": 0.005340635158790256,
+          "core_fraction": 0.020774256550856064,
+          "identity": "mode7@1.633836420",
+          "te_fraction": 0.9872422545021313
+        },
+        {
+          "anchor_overlap": 0.002763546899015486,
+          "core_fraction": 0.010959258901549297,
+          "identity": "mode8@1.631832323",
+          "te_fraction": 0.9902120060112025
+        }
+      ],
+      "end": "output",
+      "field_source": "original checksummed Block 2 raw-mode cache",
+      "full_domain_anchor_neff": 1.759346064447981,
+      "geometry": {
+        "box_thickness_m": 3e-06,
+        "d_c2c_m": 8e-06,
+        "h_gap_m": 1e-06,
+        "h_rib_m": 1.75e-07,
+        "h_wg_m": 3.5e-07,
+        "liquid_index": 1.55,
+        "state": "cross",
+        "w1_m": 1.8677383615142105e-06,
+        "w2_m": 2e-06
+      },
+      "recovered_anchor_overlap": 0.9999991976420358,
+      "recovered_core_fraction": 0.8147118363206254,
+      "recovered_neff_error": 2.55973608775939e-05,
+      "selected_anchor_overlap": 0.00906616360218026,
+      "selected_core_fraction": 0.041216968674376554,
+      "wavelength_m": 1.26e-06
+    }
+  ],
+  "fresh_fde_solves": 1,
+  "max_seconds": 2700,
+  "max_solves": 60,
+  "runtime_seconds": 41.42200000000594,
+  "scope": "real saved fields or explicitly labeled targeted reconstruction; no full block runs"
+}

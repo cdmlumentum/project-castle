@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vertical-liquid-adiabatic-coupler"
-version = "0.26.1"
+version = "0.26.2"
 description = "Reproducible MODE/FDE workflow for a liquid-controlled vertical SiN adiabatic coupler"
 requires-python = ">=3.10"
 dependencies = [

@@ -125,6 +125,23 @@ The endpoint beta plot joins only the calculated endpoints with straight lines o
 
 ## Sources and implementation files
 
+For the named guarded-tracking / monotone-Powell alternative, use
+`config/native_monotone.json` with the package `block2` command. See
+[v0.26.2 tracking review](../changes/v26_2.md) for the endpoint preflight,
+bounded recovery, candidate rejection and short-pilot requirements. These
+settings are not supported by the standalone coordinate-pattern bundle.
+
+The endpoint-field diagnostic runs only selected 1260 nm isolated cross-sections:
+
+```powershell
+python tools/diagnose_block2_tracking.py --block1 outputs/endpoint --block2 outputs/profile --out diagnostics/tracking
+```
+
+It reads original fields where available and labels fresh reconstructions.
+Its fresh-solve budget is 60 FDE solves / 45 minutes; it does not run either
+optimization block. Field alignment uses the existing transverse E-field norm,
+not Ansys's electromagnetic power-overlap integral.
+
 - `src/vlac/native/vlac_core.lsf`: geometry, FDE, interpolation, tracking, extraction, B-splines and complete profile grids.
 - `src/vlac/native/vlac_blocks.lsf`: standalone searches and midpoint convergence checks.
 - `src/vlac/native_backend.py`: package adapter and source-aware native caches.

@@ -271,5 +271,14 @@ def run_single_block(block, config, output, source_dir, *, backend_factory, prog
     from .progress import ProgressReporter
     with output_attempt(output, progress.command) as attempt:
         attempt_progress = ProgressReporter(progress.command, attempt, context={'block': block})
-        return _run_single_block(block, config, attempt, source_dir, backend_factory=backend_factory,
-                                 progress=attempt_progress, validation_only=validation_only)
+        try:
+            return _run_single_block(block, config, attempt, source_dir, backend_factory=backend_factory,
+                                     progress=attempt_progress, validation_only=validation_only)
+        except Exception as exc:
+            # Keep the actual solve counts and final attempt status when a new
+            # validity gate rejects a run before an artifact can be published.
+            attempt_progress.fail(exc)
+            write_json(attempt/f'block{block}_attempt_failure.json',{
+                'status':'failed','execution_completed':False,'error_type':type(exc).__name__,
+                'error':str(exc),'runtime_diagnostics':attempt_progress.runtime_stats})
+            raise

@@ -57,6 +57,8 @@ def _endpoint_packet(endpoint):
 
 def prepare_bundle(config, output, *, endpoint_dir=None, profile_dir=None, width_samples=None):
     config.validate()
+    if config.solver.tracking_method != 'legacy' or config.optimizer.method == 'monotone_powell':
+        raise ValueError('Guarded tracking and monotone Powell require tools/run_vlac.py block2 with the native backend; standalone coordinate_pattern is a different method.')
     g, e, o, d = config.geometry, config.endpoint_search, config.optimizer, config.device
     if g.h_gap_bounds_m[0] != g.h_gap_bounds_m[1] or g.h_rib_bounds_m[0] != g.h_rib_bounds_m[1]:
         raise ValueError("Standalone native blocks currently require fixed h_gap and h_rib")

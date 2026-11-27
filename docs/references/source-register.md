@@ -20,3 +20,16 @@ Record every reference used to make a workflow, model, data, or validation decis
 | REF-014 | Ansys Optics: script error handling and property-name detection | Accessed 2026-11-26 | [try](https://optics.ansys.com/hc/en-us/articles/360034928513-try-Script-command), [findstring](https://optics.ansys.com/hc/en-us/articles/360034405954-findstring-Script-command) | Preserve native error details and detect the optional FDE autoscale property; installed v221 support was inspected directly, separately from current documentation | current |
 
 Use a short, stable ID such as `REF-001`. In **Relevance to workflow**, name the requirement, model assumption, input, interface, or validation case supported by the source. In **Status**, use `current`, `superseded`, or `pending review`.
+
+## Guarded tracking and monotone splines (2026-11-27)
+
+- REF-009: [Ansys getdata](https://optics.ansys.com/hc/en-us/articles/360034409834-getdata-Script-command).
+  Raw MODE field access; the installed v221 command is reused unchanged.
+- REF-010: [Ansys overlap](https://optics.ansys.com/hc/en-us/articles/360034405254-overlap-Script-command).
+  Documents mode alignment and the E/H power-overlap definition. The project's
+  normalized transverse-E similarity is explicitly a different tracking metric;
+  no post-v221 rectilinear-dataset overlap API is introduced.
+- REF-011: [SciPy BSpline](https://docs.scipy.org/doc/scipy/reference/generated/scipy.interpolate.BSpline.html).
+  Basis representation and derivative API. The ordered-coefficient guarantee
+  follows from nonnegative lower-degree derivative basis functions; the new
+  parameterization does not replace the cubic spline or its knots.

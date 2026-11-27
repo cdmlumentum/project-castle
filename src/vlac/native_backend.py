@@ -51,12 +51,16 @@ def snapshot_from_native(value) -> ModeSnapshot:
         complex(scalar(value["neff"])), np.asarray(value["ex"], dtype=complex),
         np.asarray(value["ey"], dtype=complex), float(scalar(value["te_fraction"])),
         float(scalar(value["core_fraction"])), value["identity"],
+        None if value.get('x_m') is None else np.asarray(value['x_m']).reshape(-1),
+        None if value.get('y_m') is None else np.asarray(value['y_m']).reshape(-1),
+        float(scalar(value.get('center_x_m',0.))),
     )
 
 
 def snapshot_to_native(value: ModeSnapshot):
     """Preserve complex neff using the matrix type accepted by lumapi v221."""
     payload = asdict(value)
+    payload = {k:v for k,v in payload.items() if v is not None}
     payload["neff"] = np.array([[value.neff]], dtype=complex)
     return payload
 
@@ -281,6 +285,7 @@ class NativeLumapiBackend(LumapiBackend):
         refs = () if reference is None else (ModeReference(reference, reference, (reference, reference)),)
         key = stable_key({"isolated_native": self.script_hash, "provenance": optical_identity(self.config), "config": self.native_config(mesh_accuracy),
                           "geometry": asdict(geometry), "wavelength": wavelength_m, "guide": guide,
+                          "tracking_method":self.config.solver.tracking_method,
                           "compact": compact, "reference": reference.fingerprint() if reference else None})
         if self.cache and use_cache:
             cached = self.cache.get(key, kind="native_isolated")
@@ -288,6 +293,13 @@ class NativeLumapiBackend(LumapiBackend):
                 return cached
         candidates = self._raw_packets([self._raw_request(geometry, wavelength_m, guide=='upper', guide=='lower', compact)],
                                        mesh_accuracy=mesh_accuracy, use_cache=use_cache)[0]
+        if self.config.solver.tracking_method == 'guarded_translation_v1':
+            from .tracking import select_isolated
+            modes = [snapshot_from_native(v) for v in candidates['items'][:int(scalar(candidates['n']))]]
+            result = select_isolated(modes,refs,guide,self.config)
+            if self.cache and use_cache:
+                self.cache.put(key,result,kind='native_isolated')
+            return result
         value = self._call_native("vlac_select_isolated", [candidates, pack_references(refs), guide], mesh_accuracy=mesh_accuracy)
         result = snapshot_from_native(value["mode"]), float(scalar(value["overlap"]))
         if self.cache and use_cache:
@@ -295,6 +307,8 @@ class NativeLumapiBackend(LumapiBackend):
         return result
 
     def evaluate_coefficients(self, geometry, wavelength_m, *, references=(), previous_kappa=None):
+        if self.config.solver.tracking_method == 'guarded_translation_v1':
+            return self._guarded_coefficients(geometry,wavelength_m,references,previous_kappa)
         key = self._cache_identity(geometry, wavelength_m, reference_fingerprints=(ref.fingerprint() for ref in references),
                                    previous_kappa=previous_kappa)
         if self.cache:
@@ -312,9 +326,68 @@ class NativeLumapiBackend(LumapiBackend):
             self.cache.put(key, result, kind="native_coefficients")
         return result
 
+    def _guarded_coefficients(self, geometry, wavelength, references, previous_kappa):
+        """Same raw FDE and complex extraction, with validated isolated tracking.
+
+        Raw packets are already transferred by the cached native path. Reusing
+        them for Python selection adds no FDE solve or extra field retrieval.
+        """
+        from .tracking import select_isolated, require_candidate, CandidateRejected
+        from .modes import select_supermode_pair, extract_coupling, field_overlap
+        raw = self._raw_packets([self._raw_request(geometry,wavelength,u,l) for u,l in ((1,0),(0,1),(1,1))])
+        candidates = [[snapshot_from_native(v) for v in packet['items'][:int(scalar(packet['n']))]] for packet in raw]
+        upper, u_overlap = select_isolated(candidates[0],references,'upper',self.config)
+        lower, l_overlap = select_isolated(candidates[1],references,'lower',self.config)
+        eligible = [m for m in candidates[2] if m.te_fraction >= self.config.solver.minimum_te_fraction]
+        if len(eligible)<2:
+            raise CandidateRejected('Fewer than two TE-eligible coupled modes.')
+        plus, minus, pair_overlap = select_supermode_pair(eligible,upper,lower,previous=references,
+                                  minimum_te_fraction=self.config.solver.minimum_te_fraction)
+        ul = field_overlap(upper,lower)
+        u, l = field_overlap(plus,upper)**2, field_overlap(plus,lower)**2
+        check = float('nan')
+        scale = 2*np.pi/wavelength
+        if u+l>0 and ul<=self.config.solver.field_overlap_crosscheck_max_basis_overlap:
+            check = abs(scale*(plus.neff-minus.neff)/2)*2*np.sqrt(u*l)/(u+l)
+        coefficient = extract_coupling(*(scale*m.neff for m in (upper,lower,plus,minus)),
+            previous_kappa=previous_kappa,kappa_profile_check=float(check),overlap_upper_lower=ul,
+            min_mode_overlap=min(u_overlap,l_overlap,pair_overlap),
+            identities=tuple(m.identity for m in (upper,lower,plus,minus)))
+        require_candidate(coefficient,self.config)
+        return coefficient, ModeReference(upper,lower,(plus,minus),valid=True)
+
+    def require_endpoint_consistency(self, endpoint, *, progress=None):
+        from .tracking import endpoint_consistency, EndpointConsistencyError
+        from .geometry import make_geometry
+        from types import SimpleNamespace
+        from .block_io import write_json
+        wavelengths = np.asarray(endpoint.wavelengths_m)
+        grid = []
+        for wavelength in wavelengths:
+            row = []
+            for width,offset in ((endpoint.w1_input_m,self.config.geometry.d_c2c_input_m),
+                                 (endpoint.w1_output_m,self.config.geometry.d_c2c_output_m)):
+                geometry = make_geometry(self.config.geometry,w1_m=width,h_rib_m=endpoint.h_rib_m,
+                    h_gap_m=endpoint.h_gap_m,d_c2c_m=offset,state='cross',
+                    liquid_index=float(self.bank.liquid_cross.index(wavelength)))
+                modes = [self.solve_isolated_mode(geometry,float(wavelength),guide=guide,compact_x=False)[0]
+                         for guide in ('upper','lower')]
+                upper, lower = (2*np.pi*m.neff/wavelength for m in modes)
+                row.append(SimpleNamespace(beta_upper=upper,beta_lower=lower,delta_beta=upper-lower))
+            grid.append(row)
+        report = endpoint_consistency(grid,wavelengths,endpoint,self.config)
+        if progress:
+            write_json(progress.output_dir/'endpoint_tracking_preflight.json',report)
+            progress.checkpoint('endpoint_tracking_preflight',report)
+        if not report['passed']:
+            raise EndpointConsistencyError('Fixed-endpoint full/compact mode consistency failed at unchanged tolerance: '+str(report))
+        return report
+
     def evaluate_profile_grid(self, config, bank, endpoint, w_control, d_control, z, wavelengths, *, state, progress=None):
         request = profile_request(endpoint, w_control, d_control, z, wavelengths, state)
-        key = stable_key({"native_grid": self.script_hash, "provenance": optical_identity(self.config), "config": self.native_config(), "request": request})
+        key = stable_key({"native_grid": self.script_hash, "provenance": optical_identity(self.config), "config": self.native_config(),
+                          "tracking_method":config.solver.tracking_method,"recovery_depth":config.solver.tracking_recovery_depth,
+                          "request": request})
         if self.cache:
             cached = self.cache.get(key, kind="native_profile_grid")
             if cached is not None:

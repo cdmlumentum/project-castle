@@ -70,6 +70,10 @@ def _axis_validation_errors(base, checked, coordinates, refined, axis, delta_sca
 def optimize_profiles(backend, config: WorkflowConfig, bank: MaterialBank, endpoint: EndpointSearchResult, *, progress=None, checkpoint_dir=None):
     """Bounded Powell at the band edges, with a longitudinal FDE grid check."""
     g, d, o = config.geometry, config.device, config.optimizer
+    if config.solver.tracking_method == 'guarded_translation_v1':
+        # A fixed-endpoint inconsistency cannot be repaired by interior controls.
+        # Diagnose it once, before spending the optimization allowance.
+        backend.require_endpoint_consistency(endpoint,progress=progress)
     planner = ProfilePlanner(o.complete_within_seconds, started=getattr(progress, 'started', None))
     ncp = o.control_points
     w0 = np.linspace(endpoint.w1_input_m, endpoint.w1_output_m, ncp)
@@ -77,6 +81,9 @@ def optimize_profiles(backend, config: WorkflowConfig, bank: MaterialBank, endpo
     lower = np.r_[np.full(ncp-2,g.w1_min_m),np.full(ncp-2,g.d_c2c_bounds_m[0])]
     upper = np.r_[np.full(ncp-2,g.w1_max_m),np.full(ncp-2,g.d_c2c_bounds_m[1])]
     initial = _normalized_controls(np.r_[w0[1:-1],dc0[1:-1]],lower,upper)
+    if o.method == 'monotone_powell':
+        from .monotone import linear_coordinates
+        initial = np.tile(linear_coordinates(ncp),2)
     z = np.linspace(0,d.length_m,d.z_samples_initial)
     wavelengths = np.array([d.wavelength_min_m, d.wavelength_max_m])
     history, grid_history = [], []
@@ -113,6 +120,11 @@ def optimize_profiles(backend, config: WorkflowConfig, bank: MaterialBank, endpo
         progress.start_stage("Cross-state profile optimization", unit="objective evaluations")
 
     def unpack(unit):
+        if o.method == 'monotone_powell':
+            from .monotone import controls
+            unit = np.clip(np.asarray(unit),0,1)
+            return (controls(unit[:ncp-2],endpoint.w1_input_m,endpoint.w1_output_m),
+                    controls(unit[ncp-2:],g.d_c2c_input_m,g.d_c2c_output_m))
         physical = lower + np.clip(np.asarray(unit),0,1)*(upper-lower)
         return (np.r_[endpoint.w1_input_m,physical[:ncp-2],endpoint.w1_output_m],
                 np.r_[g.d_c2c_input_m,physical[ncp-2:],g.d_c2c_output_m])
@@ -133,7 +145,18 @@ def optimize_profiles(backend, config: WorkflowConfig, bank: MaterialBank, endpo
             if penalty:
                 return penalty,None,None,None
             sample_started = time.monotonic()
-            coefficients = evaluate_design_profiles(backend,config,bank,endpoint,w,dc,z,wavelengths,state="cross")
+            from .tracking import CandidateRejected, EndpointConsistencyError
+            try:
+                coefficients = evaluate_design_profiles(backend,config,bank,endpoint,w,dc,z,wavelengths,state="cross")
+            except EndpointConsistencyError:
+                raise
+            except CandidateRejected as exc:
+                if progress:
+                    progress.note('Candidate rejected before objective/reference reuse: '+str(exc),force=True)
+                    progress.checkpoint('rejected_profile_candidate',{'w_control_m':w.tolist(),
+                        'd_control_m':dc.tolist(),'reason':str(exc)})
+                planner.observe(time.monotonic()-sample_started,len(z)*len(wavelengths))
+                return 1e6,None,None,None
             planner.observe(time.monotonic()-sample_started, len(z)*len(wavelengths))
             value,delta_target,kappa_target = minimax_objective(coefficients,z,d.length_m,endpoint.delta_beta_max_rad_per_m)
             memo[key] = value,coefficients,delta_target,kappa_target
@@ -182,11 +205,18 @@ def optimize_profiles(backend, config: WorkflowConfig, bank: MaterialBank, endpo
         final_w,final_dc = unpack(result.x)
         value,coefficients,delta_target,kappa_target = evaluate(result.x)
         if coefficients is None:
-            raise RuntimeError("Profile optimizer returned controls violating the configured fabrication limits.")
+            if best_entry is None:
+                raise RuntimeError('No optically valid profile candidate was found; rejected extractions were not fitted.')
+            result.x = best_unit
+            value,coefficients,delta_target,kappa_target = best_entry
+            final_w,final_dc = unpack(best_unit)
+            result.success = False
+            result.message = 'Returned best valid candidate after optimizer ended on a rejected candidate.'
         history.append({"grid_refinement":refinement,"n_z":len(z),"n_wavelengths":len(wavelengths),
                         "evaluations":evaluations,"objective":value,"success":bool(result.success),
                         "message":str(result.message),"control_w1_m":final_w.tolist(),"control_d_c2c_m":final_dc.tolist(),
-                        "coordinate_system":"unit_interval", "normalized_controls":result.x.tolist()})
+                        "coordinate_system":("monotone_stick_breaking_v1" if o.method=='monotone_powell' else "unit_interval"),
+                        "method":o.method,"normalized_controls":result.x.tolist()})
         if o.complete_within_seconds is not None:
             history[-1]['work_plan'] = planner.report(len(z)*len(wavelengths),(2*len(z)-1)*len(wavelengths))
             history[-1]['planned_finalization'] = planned_finish
