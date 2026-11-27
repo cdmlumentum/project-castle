@@ -1,5 +1,5 @@
 """Supervise a time-planned Block 2 run; preserve logs and prevent idle sleep."""
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import argparse
 import ctypes
 import json
@@ -20,9 +20,13 @@ def main():
     parser.add_argument('--endpoint-dir',required=True)
     parser.add_argument('--out',required=True)
     parser.add_argument('--hours',type=float,default=8.)
+    parser.add_argument('--max-solves',type=int,default=12000,
+                        help='Block 2 solve cap, independent of the endpoint run budget.')
     args = parser.parse_args()
     if not 0 < args.hours <= 8:
         parser.error('--hours must be positive and at most 8')
+    if args.max_solves < 1:
+        parser.error('--max-solves must be positive')
     endpoint = Path(args.endpoint_dir).resolve()
     out = Path(args.out).resolve()
     out.mkdir(parents=True,exist_ok=True)
@@ -42,7 +46,8 @@ def main():
     # unexpected timing variation, final file publication and MODE cleanup.
     plan_seconds = max(seconds*.75,seconds-1800.)
     raw['optimizer']['complete_within_seconds'] = plan_seconds
-    raw['execution'] = dict(raw.get('execution',{}),max_seconds=seconds,resume=True)
+    raw['execution'] = dict(raw.get('execution',{}),max_seconds=seconds,
+                            max_solves=args.max_solves,resume=True)
     raw['solver']['hide_gui'] = True
     config = config_from_dict(raw)
     load_block(endpoint,1,config)  # Check compatibility before acquiring a license.
@@ -54,9 +59,12 @@ def main():
     for key in ('VLAC_CACHE_DIR','VLAC_HIDE_GUI','VLAC_PLATFORM','LUMERICAL_PYTHON_API'):
         env.pop(key,None)
     started = time.monotonic()
-    record = {'status':'starting','started_utc':datetime.now(timezone.utc).isoformat(),
+    started_utc = datetime.now(timezone.utc)
+    record = {'status':'starting','started_utc':started_utc.isoformat(),
+        'deadline_utc':(started_utc+timedelta(seconds=seconds)).isoformat(),
         'source_checkout':str(ROOT),'source_commit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
         'command':command,'maximum_wall_seconds':seconds,'completion_plan_seconds':plan_seconds,
+        'maximum_fde_solves':args.max_solves,
         'numerical_changes':'Measured-cost profile work allocation only; endpoint geometry, mesh and tolerances preserved.',
         'block0_certificate_applied':bool(config.solver.calibration),'supervisor_pid':os.getpid()}
     write_json(record_path,record)
