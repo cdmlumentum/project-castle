@@ -20,7 +20,7 @@ import uuid
 import numpy as np
 from scipy.interpolate import PchipInterpolator
 
-from .block0 import base_profiles, certified_profile, installation_identity, margins
+from .block0 import base_profiles, certified_profile, input_identity, installation_identity, margins
 from .block_io import digest, load_block, source_record, write_json
 from .geometry import ClampedCubicProfile, make_geometry
 from .materials import build_material_bank
@@ -138,15 +138,21 @@ def coefficient_pair(upper, lower, candidates, references, previous_kappa, confi
     return coefficient, ModeReference(upper, lower, (plus, minus))
 
 
-def profile_positions(config, solution):
-    """Three base points, their independent midpoints, and zero-offset roots."""
+def alignment_roots(config, solution):
     length = config.device.length_m
-    coarse = np.linspace(0, length, 3)
     offset = ClampedCubicProfile(length, solution.d_c2c_control_m)
     from scipy.interpolate import PPoly
     roots = PPoly.from_spline(offset._spline).roots(extrapolate=False)*length
-    roots = roots[np.isfinite(roots) & (roots > 0) & (roots < length)]
-    fine = np.unique(np.round(np.r_[coarse, (coarse[:-1]+coarse[1:])/2, roots]/length, 12))*length
+    return np.unique(roots[np.isfinite(roots) & (roots > 0) & (roots < length)])
+
+
+def profile_positions(config, solution):
+    """Endpoints, representative alignment, and two held-out midpoints."""
+    length = config.device.length_m
+    roots = alignment_roots(config, solution)
+    center = roots[np.argmin(abs(roots-length/2))] if len(roots) else length/2
+    coarse = np.array([0., center, length])
+    fine = np.sort(np.r_[coarse, (coarse[:-1]+coarse[1:])/2])
     return coarse, fine
 
 
@@ -157,7 +163,9 @@ def prepare(config, stage, profile_dir=None, limits=Limits()):
     endpoint = solution = source = None
     if profile_dir:
         endpoint, solution, _, artifact = load_block(profile_dir, 2, config)
-        source = source_record(artifact)
+        source = {k: v for k, v in source_record(artifact).items() if k != 'validation'}
+        source.update(path=str(Path(profile_dir).resolve()),
+                      validation_status=artifact.get('validation', {}).get('status', 'unknown'))
     elif stage == 'full':
         raise ValueError('--stage full requires --profile-dir with a validated Block 2 handoff')
     elif any(a != b for a, b in (config.geometry.h_gap_bounds_m, config.geometry.h_rib_bounds_m)):
@@ -176,10 +184,13 @@ def prepare(config, stage, profile_dir=None, limits=Limits()):
     wavelengths = np.linspace(config.device.wavelength_min_m, config.device.wavelength_max_m, 3)
     coarse, fine = profile_positions(config, solution) if stage == 'full' else (np.array([]), np.array([]))
     plan = {'method': METHOD, 'stage': stage, 'wavelengths_m': wavelengths.tolist(),
+        'coefficient_wavelengths_m': wavelengths[[0, -1]].tolist(),
         'coarse_z_m': coarse.tolist(), 'z_m': fine.tolist(), 'source': source,
+        'all_alignment_roots_m': alignment_roots(config, solution).tolist() if solution is not None else [],
+        'alignment_coverage': 'At most one root, nearest the device midpoint; other roots are not certified',
         'profiles': {k: asdict(v) for k, v in profiles.items()}, 'limits': asdict(limits),
-        'nominal_fde_calls': 20+4*len(fine)*len(wavelengths),
-        'coverage': 'Three wavelengths (edges and center); five z points plus zero-offset roots. No continuous-band or optimizer-envelope claim.',
+        'nominal_fde_calls': 20+4*len(fine)*2,
+        'coverage': 'Lower screen: band edges and center. Coefficients: band edges at five z positions, including one representative alignment. No continuous-band or optimizer-envelope claim.',
         'scope': 'lower-mode approximation on this physical stack and fixed sampled profile; no optimizer or physical-device validation',
         'field_metric': 'Squared normalized transverse E overlap; not an E/H power integral',
         'wall_time_policy': 'Soft boundary between FDE calls and propagation cases; active calls may overrun',
@@ -192,15 +203,16 @@ class CheckRun:
         if not isinstance(max_solves, int) or max_solves < 1 or not np.isfinite(max_seconds) or max_seconds <= 0:
             raise ValueError('Run budgets must be positive and finite')
         self.config, self.out, self.plan, self.probe = config, Path(output).resolve(), plan, probe
-        self.budget = RunBudget(type('Settings', (), {'max_solves': max_solves, 'max_seconds': max_seconds})())
+        self.budget = RunBudget(replace(config.execution, max_solves=max_solves, max_seconds=max_seconds))
         self.started = time.monotonic()
         self.confirmed_solves = self.uncertain_attempts = 0
         self.hits = 0
-        self.rows = []
         self.identity = digest({'plan': plan, 'config': config.as_dict(),
+            'optical_input_id': input_identity(config),
             'implementation': {name: hashlib.sha256(files('vlac').joinpath(name).read_bytes()).hexdigest()
                 for name in ('lower_state_check.py', 'modes.py', 'geometry.py', 'materials.py',
-                             'native_backend.py', 'native/vlac_core.lsf', 'propagate.py')},
+                             'native_backend.py', 'native/vlac_core.lsf', 'propagate.py',
+                             'config.py', 'block_io.py', 'profiles.py', 'runtime.py')},
             'installation': installation_identity(config), 'synthetic': bool(probe.synthetic)})
         previous = self.out/'plan.json'
         if previous.exists():
@@ -369,7 +381,7 @@ def _check_profile(run, config, endpoint, solution, geometry, lower, profile, li
     for state in ('cross', 'bar'):
         previous_lambda = [None]*len(z)
         approximate_previous_lambda = [None]*len(z)
-        for wavelength in run.plan['wavelengths_m']:
+        for wavelength in run.plan['coefficient_wavelengths_m']:
             baseline, substituted, current, approximate_current = [], [], [], []
             previous = previous_approximate = None
             previous_kappa = previous_approximate_kappa = None
@@ -481,6 +493,13 @@ def _supervise(arguments, output, seconds):
         stdout, _ = worker.communicate(timeout=seconds)
         if stdout:
             print(stdout.decode('utf-8', errors='replace'), end='')
+        report_path = Path(output)/'report.json'
+        report = json.loads(report_path.read_text()) if report_path.exists() else {}
+        if report.get('run_id') == run_id and (report.get('status') == 'running' or worker.returncode not in (0, 2, 3)):
+            report.update(status='failed', execution_completed=False, eligible_for_shared_lower_mode=False,
+                          reason=f'Isolated MODE worker exited unexpectedly with code {worker.returncode}')
+            write_json(report_path, report)
+            return 2
         return worker.returncode
     except subprocess.TimeoutExpired:
         # Only the dedicated diagnostic worker and its descendants are terminated.

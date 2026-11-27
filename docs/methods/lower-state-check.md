@@ -25,12 +25,15 @@ Replace the example profile paths with a completed compatible Block 2 run.
 opening MODE or writing outputs. The supplied configuration must match the saved
 handoff. A screen without a saved profile requires fixed gap and slab thickness.
 
-The smaller workload uses **three wavelengths** (edges and center), three base z
-points, their two independent midpoints, and all additional zero-offset roots of
-the saved spline. The screen uses 20 nominal FDE calls; the full comparison uses
-80 when there are five z positions. Extra alignment roots add work, shown in the
-plan. This samples the frozen geometry; it does not validate the continuous band
-or all optimizer-admissible geometries.
+The smaller workload uses **three wavelengths** (edges and center) for the lower
+screen, and **the two band edges** for the coefficient/propagation comparison,
+matching the existing Block 2 wavelength policy. Its five z positions are the
+endpoints, one representative alignment nearest the device midpoint (or the
+midpoint if no alignment exists), and the two intervening independent midpoints.
+The screen uses 20 nominal FDE calls; the full comparison uses **60 total**.
+All alignment roots are listed in the plan, but other roots are not certified.
+This samples the frozen geometry; it does not validate the continuous band,
+additional alignments or all optimizer-admissible geometries.
 
 The CLI runs a dedicated worker with a **3300 second hard cutoff**, including
 startup, leaving cleanup time within an hour. `--max-seconds` can shorten this but
@@ -66,7 +69,7 @@ wavelength and z. Each state's own lower mode gives the reference. The alternati
 substitutes the cross lower mode while retaining actual coupled eigenvalues,
 upper-minus-lower detuning and the complex square-root branch convention. A
 separate selection comparison detects coupled-pair changes caused by the shared
-field. Both coefficient sets receive held-out midpoint/alignment checks against
+field. Both coefficient sets receive held-out midpoint checks against
 PCHIP from the three base points. Both launches use the existing converged RK4
 propagator. Cross-state objective values are recorded. No optimizer is rerun.
 

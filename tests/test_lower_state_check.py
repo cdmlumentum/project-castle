@@ -99,6 +99,17 @@ class LowerStateCheckTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             check.prepare(self.config, 'full', self.out)
 
+    def test_multiple_alignments_keep_five_position_subhour_scope(self):
+        fixture = self.fixture()
+        fixture[1].d_c2c_control_m = np.array([-8, 1.926922, 1.083231, -5.236155, 4.796975, 8])*1e-6
+        with patch.object(check, 'load_block', return_value=fixture):
+            plan = check.prepare(self.config, 'full', 'SYNTHETIC')[0]
+        self.assertGreater(len(plan['all_alignment_roots_m']), 1)
+        self.assertEqual(len(plan['z_m']), 5)
+        self.assertEqual(plan['nominal_fde_calls'], 60)
+        center = plan['coarse_z_m'][1]
+        self.assertAlmostEqual(center, min(plan['all_alignment_roots_m'], key=lambda v: abs(v-self.config.device.length_m/2)))
+
     def test_screen_is_twenty_fresh_solves_and_never_qualifies_synthetic(self):
         report = self.run_check(max_solves=40)
         self.assertEqual(report['fresh_fde_calls'], 20)
@@ -188,10 +199,10 @@ class LowerStateCheckTests(unittest.TestCase):
     def test_full_comparison_preserves_complex_coefficients_and_both_launches(self):
         with patch.object(check, 'load_block', return_value=self.fixture()):
             report = self.run_check(stage='full', profile_dir='SYNTHETIC')
-        self.assertEqual(report['fresh_fde_calls'], 80)
-        self.assertEqual(len(report['coefficient_comparisons']), 30)
-        self.assertEqual(len(report['propagation']), 12)
-        self.assertEqual(len(report['midpoint_checks']), 24)
+        self.assertEqual(report['fresh_fde_calls'], 60)
+        self.assertEqual(len(report['coefficient_comparisons']), 20)
+        self.assertEqual(len(report['propagation']), 8)
+        self.assertEqual(len(report['midpoint_checks']), 16)
         self.assertTrue(all(v['passed'] for v in report['propagation']))
         self.assertTrue(all(v['passed'] for v in report['coefficient_comparisons']))
         self.assertFalse(report['eligible_for_shared_lower_mode'])
@@ -228,6 +239,17 @@ class LowerStateCheckTests(unittest.TestCase):
             self.assertEqual(terminate.call_args.args[0], ['taskkill', '/PID', '12345', '/T', '/F'])
         else:
             killpg.assert_called_once()
+
+    def test_worker_crash_cannot_leave_a_running_or_passing_report(self):
+        self.out.mkdir()
+        report = self.out/'report.json'
+        report.write_text(json.dumps({'run_id': 'SYNTHETIC-RUN', 'status': 'running'}))
+        worker = Mock(returncode=1)
+        worker.communicate.return_value = (b'SYNTHETIC worker crash', None)
+        with patch.object(check.uuid, 'uuid4', return_value=SimpleNamespace(hex='SYNTHETIC-RUN')), \
+             patch.object(check.subprocess, 'Popen', return_value=worker):
+            self.assertEqual(check._supervise([], self.out, 1), 2)
+        self.assertEqual(json.loads(report.read_text())['status'], 'failed')
 
 
 if __name__ == '__main__':
