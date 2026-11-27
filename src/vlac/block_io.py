@@ -20,7 +20,7 @@ from .endpoint_constraints import require_endpoint_constraints
 from .modes import Coefficients
 from .profiles import ProfileSolution, target_profiles
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 MODEL = 'full_width_slabs_v21;negative_to_positive_cross_target'
 COMPLEX_FIELDS = {'beta_upper','beta_lower','beta_plus','beta_minus','delta_beta','delta_pm','delta_12','kappa'}
 OPTIONAL_FLOATS = {'kappa_profile_check','overlap_upper_lower'}
@@ -65,6 +65,8 @@ def physics_signature(config, block):
                  'wavelength_bounds_m': [config.device.wavelength_min_m,config.device.wavelength_max_m]}
     if config.solver.calibration is not None:
         signature['block0_certificate_id'] = config.solver.calibration['certificate_id']
+    if block>=2 and config.solver.coupling_zero_evidence is not None:
+        signature['coupling_zero_evidence_sha256'] = hashlib.sha256(config.resolved_path(config.solver.coupling_zero_evidence).read_bytes()).hexdigest()
     if block>=2:
         signature['length_m'] = config.device.length_m
         signature['grid_convergence_rtol'] = config.device.grid_convergence_rtol
@@ -73,6 +75,8 @@ def physics_signature(config, block):
                 'recovery_depth':config.solver.tracking_recovery_depth,'optimizer':config.optimizer.method}
             if config.solver.endpoint_domain_policy != 'strict':
                 signature['profile_methods']['endpoint_domain_policy'] = config.solver.endpoint_domain_policy
+        if config.optimizer.method == 'tabulated_width_offset_v1':
+            signature['table_settings'] = {key:value for key,value in raw['optimizer'].items() if key.startswith('table_')}
     if block>=4: signature['propagation'] = raw['propagation']
     return clean(signature)
 
@@ -119,7 +123,8 @@ def decode_coefficients(raw):
     for row in raw:
         decoded = []
         for entry in row:
-            if set(entry)!=expected: raise ValueError('Saved coefficient fields do not match the supported schema.')
+            if set(entry)-expected or expected-set(entry)-{'zero_compatibility'}:
+                raise ValueError('Saved coefficient fields do not match the supported schema.')
             values = dict(entry)
             for key in COMPLEX_FIELDS:
                 value = values[key]
@@ -189,10 +194,18 @@ def validate_grid(grid, solution, config):
             if not np.isclose(c.delta_beta,c.beta_upper-c.beta_lower,rtol=1e-6,atol=1e-3): raise ValueError('Inconsistent saved delta_beta.')
             if not np.isclose(c.delta_12,c.delta_beta/2,rtol=1e-6,atol=1e-3): raise ValueError('Inconsistent saved delta_12.')
             if not np.isclose(c.delta_pm,(c.beta_plus-c.beta_minus)/2,rtol=1e-6,atol=1e-3): raise ValueError('Inconsistent saved delta_pm.')
-            if not np.isclose(c.kappa**2,c.delta_pm**2-c.delta_12**2,rtol=1e-5,atol=1e-2): raise ValueError('Inconsistent saved kappa extraction.')
+            if c.extraction_flag == 'zero_compatible_within_uncertainty':
+                from .coupling_uncertainty import validate_zero_compatibility
+                validate_zero_compatibility(c,config)
+            elif not np.isclose(c.kappa**2,c.delta_pm**2-c.delta_12**2,rtol=1e-5,atol=1e-2):
+                raise ValueError('Inconsistent saved kappa extraction.')
+            elif c.zero_compatibility is not None:
+                raise ValueError('Unexpected zero-compatibility audit on an uncorrected sample.')
             flags[c.extraction_flag] = flags.get(c.extraction_flag,0)+1
             low += c.min_mode_overlap<config.solver.minimum_mode_overlap
-    return {'passed': not low and all(k=='ok' for k in flags), 'low_overlap_cases': int(low),'extraction_flags': flags}
+    return {'passed': not low and all(k in {'ok','zero_compatible_within_uncertainty'} for k in flags),
+            'low_overlap_cases': int(low),'extraction_flags': flags,
+            'uncertainty_qualified_zero_cases':flags.get('zero_compatible_within_uncertainty',0)}
 
 
 def validate_solution(solution, endpoint, config):
@@ -207,18 +220,19 @@ def validate_solution(solution, endpoint, config):
         if values.ndim!=1 or len(values)<4 or not np.all(np.isfinite(values)) or np.any(values<bounds[0]-1e-15) or np.any(values>bounds[1]+1e-15):
             raise ValueError('Saved profile controls are invalid or outside bounds.')
         if not np.allclose(values[[0,-1]],ends,rtol=0,atol=1e-15): raise ValueError('Saved profile endpoint controls changed.')
-        if config.optimizer.method in {'monotone_powell','sequential_width_offset_v1'}:
+        if config.optimizer.method in {'monotone_powell','sequential_width_offset_v1','tabulated_width_offset_v1'}:
             from .monotone import is_monotone
             if not is_monotone(values):
                 raise ValueError('Saved profile violates monotone control ordering.')
-    expected = target_profiles(solution.z_m,config.device.length_m,endpoint.delta_beta_max_rad_per_m)
+    kappa_max = solution_kappa_max(solution,endpoint,config)
+    expected = target_profiles(solution.z_m,config.device.length_m,endpoint.delta_beta_max_rad_per_m,kappa_max)
     for actual,target in zip((solution.delta_target_rad_per_m,solution.kappa_target_rad_per_m),expected):
         if actual.shape!=target.shape or not np.allclose(actual,target,rtol=1e-10,atol=1e-6): raise ValueError('Saved coefficient targets are inconsistent.')
     if not np.isfinite(solution.objective) or solution.objective<0: raise ValueError('Saved profile objective is invalid.')
     from .profiles import minimax_objective
     from .optimize import _check_fabrication_constraints
     from .geometry import ClampedCubicProfile
-    actual_objective = minimax_objective(solution.cross_coefficients,solution.z_m,config.device.length_m,endpoint.delta_beta_max_rad_per_m)[0]
+    actual_objective = minimax_objective(solution.cross_coefficients,solution.z_m,config.device.length_m,endpoint.delta_beta_max_rad_per_m,kappa_max)[0]
     if not np.isclose(solution.objective,actual_objective,rtol=1e-9,atol=1e-7):
         raise ValueError('Saved objective does not match its coefficient grid.')
     if _check_fabrication_constraints(config,ClampedCubicProfile(config.device.length_m,solution.w1_control_m),
@@ -230,6 +244,33 @@ def validate_solution(solution, endpoint, config):
         quality['endpoint_mode_consistency'] = endpoint_consistency(solution.cross_coefficients,solution.wavelengths_m,endpoint,config)
         quality['passed'] = quality['passed'] and quality['endpoint_mode_consistency']['passed']
     return quality
+
+
+def solution_kappa_max(solution,endpoint,config=None):
+    """Validate explicit target scaling; old artifacts retain exactly D/2."""
+    nominal = .5*endpoint.delta_beta_max_rad_per_m
+    meta = solution.target_metadata
+    if not meta: return nominal
+    if (meta.get('method') != 'tabulated_width_offset_v1'
+            or (config is not None and config.optimizer.method != 'tabulated_width_offset_v1')):
+        raise ValueError('Target scaling is only supported by the named table alternative.')
+    value = float(meta['kappa_max_rad_per_m'])
+    if (not np.isfinite(value) or not 0<value<=nominal or
+            not np.isclose(meta['delta_beta_max_over_kappa_max'],2*nominal/value) or
+            not np.isclose(meta['kappa_max_over_delta_beta_max'],value/(2*nominal))):
+        raise ValueError('Saved coupling scale or ratio is invalid.')
+    from .tabulated import select_coupling_scale
+    from .geometry import blackman_theta
+    z = np.array(meta['envelope_z_m'])
+    if config is not None:
+        if z.ndim!=1 or len(z)<3 or not np.all(np.diff(z)>0) or not np.allclose(z[[0,-1]],[0,config.device.length_m],rtol=0,atol=1e-15):
+            raise ValueError('Malformed coupling envelope coordinates.')
+        zero = np.asarray(meta['zero_offset_real_coupling_rad_per_m'])
+        if zero.shape!=(2,len(z)): raise ValueError('Malformed band-edge coupling envelope.')
+        expected = select_coupling_scale(2*nominal,zero,np.sin(blackman_theta(z,config.device.length_m)))
+        for key in ('kappa_max_rad_per_m','coupling_target_reduced','original_amplitude_relationship_holds'):
+            if meta[key] != expected[key]: raise ValueError('Target scaling disagrees with sampled zero-offset envelope.')
+    return value
 
 
 def write_artifact(output, block, config, endpoint, *, solution=None, bar=None, performance=None, validation=None, source=None, characterization=None):
@@ -264,7 +305,7 @@ def write_artifact(output, block, config, endpoint, *, solution=None, bar=None, 
 
 def _read_artifact(path, block, config):
     artifact = json.loads(path.read_text(encoding='utf-8'))
-    if artifact.get('schema_version') not in {1,SCHEMA_VERSION} or artifact.get('block')!=block or artifact.get('status')!='complete':
+    if artifact.get('schema_version') not in {1,2,SCHEMA_VERSION} or artifact.get('block')!=block or artifact.get('status')!='complete':
         raise ValueError('Unsupported, incomplete, or wrong-block artifact: '+str(path))
     expected = artifact.pop('sha256',None)
     if expected!=digest(artifact): raise ValueError('Saved artifact checksum mismatch: '+str(path))

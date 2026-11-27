@@ -53,10 +53,10 @@ def _normalized_controls(physical, lower, upper):
     return np.clip((np.asarray(physical)-lower)/(upper-lower), 0., 1.)
 
 
-def _axis_validation_errors(base, checked, coordinates, refined, axis, delta_scale):
+def _axis_validation_errors(base, checked, coordinates, refined, axis, delta_scale, kappa_scale=None):
     """Compare fresh midpoint coefficients with interpolation on one axis."""
     error = 0.
-    for attr, scale in (("delta_beta", delta_scale), ("kappa", .5*delta_scale)):
+    for attr, scale in (("delta_beta", delta_scale), ("kappa", .5*delta_scale if kappa_scale is None else kappa_scale)):
         values = np.asarray([[getattr(c, attr) for c in row] for row in base], dtype=complex)
         actual = np.asarray([[getattr(c, attr) for c in row] for row in checked], dtype=complex)
         predicted = (PchipInterpolator(coordinates, values.real, axis=axis)(refined)
@@ -69,6 +69,9 @@ def _axis_validation_errors(base, checked, coordinates, refined, axis, delta_sca
 
 def optimize_profiles(backend, config: WorkflowConfig, bank: MaterialBank, endpoint: EndpointSearchResult, *, progress=None, checkpoint_dir=None):
     """Joint or sequential Powell, with fresh coefficient midpoint checks."""
+    if config.optimizer.method == 'tabulated_width_offset_v1':
+        from .tabulated import optimize_tabulated
+        return optimize_tabulated(backend,config,bank,endpoint,progress=progress,checkpoint_dir=checkpoint_dir)
     g, d, o = config.geometry, config.device, config.optimizer
     sequential = o.method == 'sequential_width_offset_v1'
     if config.solver.tracking_method == 'guarded_translation_v1':

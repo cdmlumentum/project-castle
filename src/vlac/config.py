@@ -113,6 +113,7 @@ class SolverConfig:
     coefficient_convergence_relative_tolerance: float = 0.05
     # A complete, self-contained Block 0 certificate; absent in legacy configs.
     calibration: dict | None = None
+    coupling_zero_evidence: str | None = None
 
 
 @dataclass
@@ -150,6 +151,10 @@ class OptimizerConfig:
     maximum_slope_m_per_m: float | None = None
     maximum_curvature_per_m: float | None = None
     random_seed: int = 20261120
+    table_initial_widths: int = 9
+    table_max_widths: int = 33
+    table_initial_offsets: int = 7
+    table_max_offsets: int = 25
 
 
 @dataclass
@@ -308,15 +313,27 @@ class WorkflowConfig:
             raise ValueError("The common field-overlap grid is too small.")
         if o.control_points < 4:
             raise ValueError("Use at least four spline control points per profile.")
-        if o.method not in {'bounded_powell','monotone_powell','sequential_width_offset_v1'}:
-            raise ValueError('optimizer.method must be bounded_powell, monotone_powell or sequential_width_offset_v1.')
-        if o.method == 'sequential_width_offset_v1':
+        if o.method not in {'bounded_powell','monotone_powell','sequential_width_offset_v1','tabulated_width_offset_v1'}:
+            raise ValueError('Unknown optimizer method; use bounded_powell, monotone_powell, sequential_width_offset_v1 or tabulated_width_offset_v1.')
+        if o.method in {'sequential_width_offset_v1','tabulated_width_offset_v1'}:
             if s.tracking_method != 'guarded_translation_v1' or s.engine != 'native':
                 raise ValueError('sequential_width_offset_v1 requires guarded native mode tracking.')
             if o.max_function_evaluations_per_grid < 2:
                 raise ValueError('Sequential fitting needs at least two evaluations per grid, one for each stage.')
             if not g.d_c2c_bounds_m[0] <= 0 <= g.d_c2c_bounds_m[1]:
                 raise ValueError('Sequential isolated width fitting requires x=0 inside the offset bounds.')
+        for initial, maximum in ((o.table_initial_widths,o.table_max_widths),
+                                 (o.table_initial_offsets,o.table_max_offsets)):
+            if any(isinstance(v,bool) or not isinstance(v,int) for v in (initial,maximum)) or not 3 <= initial <= maximum:
+                raise ValueError('Table sizes must be integers with 3 <= initial <= maximum.')
+        if o.method == 'tabulated_width_offset_v1':
+            if g.d_c2c_input_m*g.d_c2c_output_m >= 0:
+                raise ValueError('Table fitting requires fixed signed endpoints on opposite sides of zero.')
+            if o.table_max_widths<5:
+                raise ValueError('Coupling table requires at least five width nodes.')
+        if s.coupling_zero_evidence is not None:
+            if not isinstance(s.coupling_zero_evidence,str) or s.tracking_method != 'guarded_translation_v1':
+                raise ValueError('Zero compatibility evidence requires a path and guarded native tracking.')
         if s.tracking_method not in {'legacy','guarded_translation_v1'}:
             raise ValueError('Unknown tracking method.')
         if s.tracking_method != 'legacy' and s.engine != 'native':

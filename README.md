@@ -15,6 +15,15 @@ controls and fixed endpoints. Blocks 2 and 3 evaluate only the two endpoint
 wavelengths, including their longitudinal validation and retained-characterization
 paths. The endpoint extraction gates, optical mesh and tolerances remain unchanged.
 
+`config/native_tabulated.json` selects the [v0.26.5 table alternative](docs/changes/v26_5.md):
+adaptive detuning-versus-width and complex-coupling-versus-width/offset tables,
+followed by spline fits without optical solves inside the optimizer. If
+zero-offset coupling cannot reach the nominal target, a common reduced
+coupling amplitude and its detuning/coupling ratio are reported explicitly.
+Final coefficients still require direct FDE checks. Negative κ² is accepted as
+zero only with reviewed, compatible, sufficiently small uncertainty bounds;
+the supplied matched-slab diagnostic does not automatically approve a bound.
+
 ## Reusable execution and broadband characterization (v26)
 
 See [v26 changes](CHANGES_v26.md) and [the execution guide](docs/methods/workflow-runtime.md) for durable attempts, shared caches, checkpoints, solve/time budgets, offline inspection/reporting and frozen-profile characterization. The native configuration retains directly checked cross/bar grids for propagation; Blocks 2/3 now use endpoint wavelengths only, including retained characterization. The original Python configuration keeps edge-grid behavior unless `--characterize` is supplied. Neither path changes the physical model or reduced-mode formulation.

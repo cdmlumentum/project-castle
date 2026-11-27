@@ -11,6 +11,8 @@ FILES = ('block2_geometry.json', 'block2_geometry.csv', 'block2_target_compariso
 
 def comparison_summary(config, endpoint, solution):
     scale = endpoint.delta_beta_max_rad_per_m
+    from .block_io import solution_kappa_max
+    coupling_scale = solution_kappa_max(solution,endpoint,config)
     rows = []
     for wavelength, coefficients in zip(solution.wavelengths_m, solution.cross_coefficients):
         delta = np.asarray([c.delta_beta for c in coefficients])
@@ -25,7 +27,7 @@ def comparison_summary(config, endpoint, solution):
             'delta_beta_worst_z_m':float(solution.z_m[di]),
             'kappa_max_abs_complex_error_rad_per_m':float(kappa_error[ki]),
             'kappa_rms_complex_error_rad_per_m':float(np.sqrt(np.mean(kappa_error**2))),
-            'kappa_max_normalized_error':float(kappa_error[ki]/(.5*scale)),
+            'kappa_max_normalized_error':float(kappa_error[ki]/coupling_scale),
             'kappa_worst_z_m':float(solution.z_m[ki]),
             'delta_beta_max_abs_imag_rad_per_m':float(np.max(np.abs(delta.imag))),
             'kappa_max_abs_imag_rad_per_m':float(np.max(np.abs(kappa.imag)))})
@@ -35,8 +37,10 @@ def comparison_summary(config, endpoint, solution):
     return {'schema_version':1, 'scope':'cross-state FDE samples at saved wavelengths and z; no full-device validation',
         'beta_definition':'delta_beta = beta_upper - beta_lower; no absolute-beta Blackman target is imposed',
         'theta_definition':'integrated Blackman angle, theta(0)=0 and theta(L)=pi',
-        'delta_beta_target':'-D*cos(theta)', 'kappa_target':'(D/2)*sin(theta)',
-        'D_rad_per_m':scale, 'objective_definition':'max(abs(Re(delta_beta)-target)/D, abs(complex(kappa)-target)/(D/2))',
+        'delta_beta_target':'-D*cos(theta)', 'kappa_target':'K*sin(theta)',
+        'K_rad_per_m':coupling_scale, 'target_scaling':solution.target_metadata,
+        'delta_beta_max_over_kappa_max':scale/coupling_scale,
+        'D_rad_per_m':scale, 'objective_definition':'max(abs(Re(delta_beta)-target)/D, abs(complex(kappa)-target)/K)',
         'objective_achieved':objective, 'optimization_converged':bool(solution.optimizer_history and solution.optimizer_history[-1]['success']),
         'grid_converged':bool(solution.grid_converged), 'by_wavelength':rows}
 
@@ -45,6 +49,7 @@ def export_profile_diagnostics(output, config, endpoint, solution):
     out = Path(output)
     out.mkdir(parents=True,exist_ok=True)
     summary = comparison_summary(config,endpoint,solution)
+    coupling_scale = summary['K_rad_per_m']
     w = ClampedCubicProfile(config.device.length_m,solution.w1_control_m)
     dc = ClampedCubicProfile(config.device.length_m,solution.d_c2c_control_m)
     z = np.linspace(0,config.device.length_m,501)
@@ -69,7 +74,7 @@ def export_profile_diagnostics(output, config, endpoint, solution):
     for row in rows:
         row['delta_beta_abs_normalized_error'] = abs(row['delta_beta_residual_rad_per_m'])/endpoint.delta_beta_max_rad_per_m
         row['kappa_abs_complex_error_rad_per_m'] = abs(complex(row['kappa_residual_real_rad_per_m'],row['kappa_residual_imag_rad_per_m']))
-        row['kappa_abs_normalized_error'] = row['kappa_abs_complex_error_rad_per_m']/(.5*endpoint.delta_beta_max_rad_per_m)
+        row['kappa_abs_normalized_error'] = row['kappa_abs_complex_error_rad_per_m']/coupling_scale
     _write_csv(out/FILES[3],list(rows[0]),rows)
     fig,axes = plt.subplots(2,2,figsize=(12,8),constrained_layout=True)
     x = solution.z_m*1e6
@@ -81,15 +86,15 @@ def export_profile_diagnostics(output, config, endpoint, solution):
         axes[0,1].plot(x,kappa.real,'o-',label='Re '+label)
         axes[0,1].plot(x,kappa.imag,':',label='Im '+label)
         axes[1,0].plot(x,np.abs(delta.real-solution.delta_target_rad_per_m)/endpoint.delta_beta_max_rad_per_m,'o-',label=label)
-        axes[1,1].plot(x,np.abs(kappa-solution.kappa_target_rad_per_m)/(.5*endpoint.delta_beta_max_rad_per_m),'o-',label=label)
+        axes[1,1].plot(x,np.abs(kappa-solution.kappa_target_rad_per_m)/coupling_scale,'o-',label=label)
     # Dense target curves are analytic only; FDE curves join the saved samples.
     from .profiles import target_profiles
-    targets = target_profiles(z,config.device.length_m,endpoint.delta_beta_max_rad_per_m)
+    targets = target_profiles(z,config.device.length_m,endpoint.delta_beta_max_rad_per_m,coupling_scale)
     for ax,target in zip(axes[0],targets): ax.plot(z*1e6,target,'k--',label='Blackman target')
     axes[0,0].set(title='Upper-minus-lower detuning',ylabel='Re(Δβ) (rad/m)')
     axes[0,1].set(title='Complex coupling',ylabel='κ (rad/m)')
     axes[1,0].set(title='Normalized detuning error',ylabel='|Re(Δβ) − target| / D')
-    axes[1,1].set(title='Normalized complex coupling error',ylabel='|κ − target| / (D/2)')
+    axes[1,1].set(title='Normalized complex coupling error',ylabel='|κ − target| / K')
     for ax in axes.flat:
         ax.set_xlabel('z (µm)'); ax.legend(fontsize=8); ax.grid(alpha=.2)
     fig.suptitle(f'Block 2 cross state; J={solution.objective:.5g}; sampled FDE coefficients')

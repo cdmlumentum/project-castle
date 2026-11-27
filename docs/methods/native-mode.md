@@ -20,6 +20,12 @@ The initial local comparison took approximately 75 versus 94 seconds for the Pyt
 
 ## Run this checkout
 
+For adaptive FDE lookup tables and the explicit zero-offset capacity fallback,
+use `config/native_tabulated.json`. See [v0.26.5](../changes/v26_5.md) for the
+named alternative, target-amplitude ratios, strict extraction requirements and
+the capped matched-slab diagnostic. This path is Python-orchestrated with the
+native FDE backend; no standalone bundle implements it.
+
 For separate width-to-detuning and offset-to-coupling fits, select
 `config/native_sequential.json` with the Python `block2` command. The named
 `sequential_width_offset_v1` alternative retains the native FDE backend and

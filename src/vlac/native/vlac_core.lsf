@@ -96,8 +96,12 @@ function vlac_raw(cfg,geometry,wavelength,upper_enabled,lower_enabled,compact) {
         vlac_rectangle("buried_oxide_and_gap",silica,0,(ymin+upper_y)/2,xspan,upper_y-ymin,1);
         vlac_rectangle("upper_liquid_cladding",liquid,0,(upper_y+ymax)/2,xspan,ymax-upper_y,1);
         if (geometry.h_rib_m>0) {
-            vlac_rectangle("lower_slab",nitride,0,geometry.h_rib_m/2,xspan,geometry.h_rib_m,lower_enabled);
-            vlac_rectangle("upper_slab",nitride,0,upper_y+geometry.h_rib_m/2,xspan,geometry.h_rib_m,upper_enabled);
+            lower_slab_enabled=lower_enabled; upper_slab_enabled=upper_enabled;
+            if (isfield(cfg,"diagnostic_retain_both_slabs")) {
+                if (cfg.diagnostic_retain_both_slabs) { lower_slab_enabled=1; upper_slab_enabled=1; }
+            }
+            vlac_rectangle("lower_slab",nitride,0,geometry.h_rib_m/2,xspan,geometry.h_rib_m,lower_slab_enabled);
+            vlac_rectangle("upper_slab",nitride,0,upper_y+geometry.h_rib_m/2,xspan,geometry.h_rib_m,upper_slab_enabled);
         }
         if (geometry.h_rib_m==0) {
             if (getnamednumber("lower_slab")>0) { select("lower_slab"); delete; }

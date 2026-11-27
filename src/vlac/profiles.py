@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import numpy as np
 
 from .config import WorkflowConfig
@@ -25,12 +25,13 @@ class ProfileSolution:
     optimizer_history: list[dict]
     grid_convergence_history: list[dict]
     grid_converged: bool
+    target_metadata: dict = field(default_factory=dict)
 
 
-def target_profiles(z_m: np.ndarray, length_m: float, delta_beta_max: float):
+def target_profiles(z_m: np.ndarray, length_m: float, delta_beta_max: float, kappa_max=None):
     theta = blackman_theta(z_m, length_m)
     delta = -delta_beta_max * np.cos(theta)
-    kappa = 0.5 * delta_beta_max * np.sin(theta)
+    kappa = (0.5 * delta_beta_max if kappa_max is None else kappa_max) * np.sin(theta)
     return delta, kappa
 
 
@@ -121,10 +122,14 @@ def minimax_objective(
     z_m: np.ndarray,
     length_m: float,
     delta_beta_max: float,
+    kappa_max: float | None = None,
 ) -> tuple[float, np.ndarray, np.ndarray]:
     if delta_beta_max <= 0:
         raise ValueError("Delta_beta_max must be positive before profile optimization.")
-    delta_target, kappa_target = target_profiles(z_m, length_m, delta_beta_max)
+    kappa_max = .5*delta_beta_max if kappa_max is None else kappa_max
+    if not np.isfinite(kappa_max) or kappa_max <= 0:
+        raise ValueError('Coupling target amplitude must be finite and positive.')
+    delta_target, kappa_target = target_profiles(z_m, length_m, delta_beta_max, kappa_max)
     delta_errors, kappa_errors = [], []
     for row in coefficients:
         delta_errors.append(
@@ -135,7 +140,7 @@ def minimax_objective(
         )
         kappa_errors.append(
             [
-                abs(value.kappa - kappa_target[j]) / (0.5 * delta_beta_max)
+                abs(value.kappa - kappa_target[j]) / kappa_max
                 for j, value in enumerate(row)
             ]
         )

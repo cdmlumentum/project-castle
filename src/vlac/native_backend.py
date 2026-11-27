@@ -149,6 +149,10 @@ class NativeLumapiBackend(LumapiBackend):
                          "box_thickness_m": cfg.geometry.box_thickness_m, "state": "cross",
                          "liquid_index": cfg.materials.liquid_cross_n},
         }
+        # Diagnostic-only alternative; production isolated definitions stay
+        # compatible with Block 1. Included in raw cache identity.
+        if getattr(self,'diagnostic_retain_both_slabs',False):
+            payload['diagnostic_retain_both_slabs'] = 1.
         if cfg.solver.calibration:
             from .block0 import certified_profile
             payload['full_profile'] = certified_profile(cfg, 'coupled').native()
@@ -357,6 +361,8 @@ class NativeLumapiBackend(LumapiBackend):
             previous_kappa=previous_kappa,kappa_profile_check=float(check),overlap_upper_lower=ul,
             min_mode_overlap=min(u_overlap,l_overlap,pair_overlap),
             identities=tuple(m.identity for m in (upper,lower,plus,minus)))
+        from .coupling_uncertainty import apply_zero_compatibility
+        coefficient = apply_zero_compatibility(coefficient,self.config,geometry,wavelength)
         valid = True
         try:
             require_candidate(coefficient,self.config)
@@ -425,9 +431,12 @@ class NativeLumapiBackend(LumapiBackend):
 
     def evaluate_profile_grid(self, config, bank, endpoint, w_control, d_control, z, wavelengths, *, state, progress=None):
         request = profile_request(endpoint, w_control, d_control, z, wavelengths, state)
+        evidence_path = config.resolved_path(config.solver.coupling_zero_evidence)
+        from .provenance import file_digest
         key = stable_key({"native_grid": self.script_hash, "provenance": optical_identity(self.config), "config": self.native_config(),
                           "tracking_method":config.solver.tracking_method,"recovery_depth":config.solver.tracking_recovery_depth,
                           "endpoint_domain_policy":config.solver.endpoint_domain_policy,
+                          "zero_evidence_sha256":None if evidence_path is None else file_digest(evidence_path),
                           "request": request})
         if self.cache:
             cached = self.cache.get(key, kind="native_profile_grid")

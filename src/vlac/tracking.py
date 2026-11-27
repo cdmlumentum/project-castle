@@ -57,10 +57,14 @@ def select_isolated(candidates, references, guide, config):
 
 
 def require_candidate(coefficient, config):
+    accepted = coefficient.extraction_flag == 'ok'
+    if coefficient.extraction_flag == 'zero_compatible_within_uncertainty':
+        from .coupling_uncertainty import validate_zero_compatibility
+        accepted = validate_zero_compatibility(coefficient,config)
     values = [getattr(coefficient,name) for name in ('beta_upper','beta_lower','beta_plus','beta_minus','delta_beta','kappa')]
     if (not np.all(np.isfinite(values)) or not np.isfinite(coefficient.min_mode_overlap)
             or coefficient.min_mode_overlap < config.solver.minimum_mode_overlap
-            or coefficient.extraction_flag != 'ok'):
+            or not accepted):
         raise CandidateRejected('Rejected optical extraction: '+coefficient.extraction_flag+
                                 f'; minimum overlap={coefficient.min_mode_overlap:.6g}')
 

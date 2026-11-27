@@ -14,9 +14,9 @@ def refine(axis):
     return np.sort(np.r_[axis, (axis[:-1]+axis[1:])/2])
 
 
-def interpolation_error(base, actual, z, wavelengths, zz, ww, scale, length):
+def interpolation_error(base, actual, z, wavelengths, zz, ww, scale, length, kappa_scale=None):
     error = 0.
-    for name, normalization in (('delta_beta', scale), ('kappa', scale/2)):
+    for name, normalization in (('delta_beta', scale), ('kappa', scale/2 if kappa_scale is None else kappa_scale)):
         values = np.array([[getattr(c, name) for c in row] for row in base], complex)
         expected = np.array([[getattr(c, name) for c in row] for row in actual], complex)
         predicted = []
@@ -67,8 +67,10 @@ def characterize_profile(backend, config, bank, endpoint, solution, *, progress=
             history.append({'iteration': iteration, 'passed': False, 'reason': 'axis_limit_before_independent_check'})
             break
         checked = evaluate(zz, ww)
+        from .block_io import solution_kappa_max
         errors = {state: interpolation_error(grids[state], checked[state], z, wavelengths, zz, ww,
-                                             endpoint.delta_beta_max_rad_per_m, config.device.length_m) for state in grids}
+                                             endpoint.delta_beta_max_rad_per_m, config.device.length_m,
+                                             solution_kappa_max(solution,endpoint,config)) for state in grids}
         quality = {state: validate_grid(checked[state], replace(solution, z_m=zz, wavelengths_m=ww), config)
                    for state in grids}
         passed = all(v <= config.device.grid_convergence_rtol for v in errors.values()) and all(v['passed'] for v in quality.values())

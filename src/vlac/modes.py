@@ -80,6 +80,7 @@ class Coefficients:
     lower_identity: str
     supermode_identities: tuple[str, str]
     extraction_flag: str = "ok"
+    zero_compatibility: dict | None = None
 
 
 def field_overlap(a: ModeSnapshot, b: ModeSnapshot) -> float:

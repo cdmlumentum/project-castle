@@ -110,6 +110,12 @@ def _coefficient_rows(
                         "supermode_plus_identity": c.supermode_identities[0],
                         "supermode_minus_identity": c.supermode_identities[1],
                         "extraction_flag": c.extraction_flag,
+                        "raw_kappa_squared_real_rad2_per_m2": (c.delta_pm**2-c.delta_12**2).real,
+                        "raw_kappa_squared_imag_rad2_per_m2": (c.delta_pm**2-c.delta_12**2).imag,
+                        "zero_compatible_kappa_upper_bound_rad_per_m": (
+                            c.zero_compatibility['kappa_absolute_upper_bound_rad_per_m'] if c.zero_compatibility else float('nan')),
+                        "zero_compatibility_evidence_sha256": (
+                            c.zero_compatibility['evidence_sha256'] if c.zero_compatibility else ''),
                     }
                 )
     return rows
@@ -376,7 +382,8 @@ def export_run(
             "w1_input_m": endpoint.w1_input_m,
             "w1_output_m": endpoint.w1_output_m,
             "Delta_beta_max_rad_per_m": endpoint.delta_beta_max_rad_per_m,
-            "kappa_max_rad_per_m": 0.5 * endpoint.delta_beta_max_rad_per_m,
+            "kappa_max_rad_per_m": solution.target_metadata.get('kappa_max_rad_per_m',0.5 * endpoint.delta_beta_max_rad_per_m),
+            "target_scaling": solution.target_metadata,
         },
         "endpoint_search_assumption": {
             "wavelength_policy": "band_edges_only_by_design_assumption",

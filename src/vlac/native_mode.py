@@ -40,6 +40,8 @@ def _coefficient_packet(grid):
     for row in grid:
         for coefficient in row:
             value = asdict(coefficient)
+            if value.pop('zero_compatibility',None) is not None:
+                raise ValueError('Uncertainty-qualified coefficients require the Python block handoff path.')
             value["plus_identity"], value["minus_identity"] = value.pop("supermode_identities")
             if not np.isfinite(value["kappa_profile_check"]):
                 value["kappa_profile_check"] = -1.

@@ -89,6 +89,7 @@ def profile_report(solution,endpoint,config):
             'coefficient_quality':quality,'objective_achieved':solution.objective,
             'target_fit_acceptance_threshold':None,
             'optimizer_method':config.optimizer.method,
+            'target_scaling':solution.target_metadata,
             'sequential_stages':([{'width':h['width_stage'],
                 'offset_objective':h['offset_objective'],'offset_success':h['offset_success'],
                 'width_frozen_during_offset_fit':h['width_frozen_during_offset_fit']}
@@ -144,7 +145,9 @@ def check_bar_grid(backend,config,bank,endpoint,solution,bar,*,progress=None):
             progress.start_stage(f'Bar-state {name} grid validation',unit='fixed-profile FDE checks')
         checked = evaluate_design_profiles(backend,config,bank,endpoint,solution.w1_control_m,solution.d_c2c_control_m,
             refined if name=='z' else solution.z_m,refined if name=='wavelength' else solution.wavelengths_m,state='bar')
-        errors[name] = _axis_validation_errors(bar,checked,current,refined,axis,endpoint.delta_beta_max_rad_per_m)
+        from .block_io import solution_kappa_max
+        errors[name] = _axis_validation_errors(bar,checked,current,refined,axis,endpoint.delta_beta_max_rad_per_m,
+                                              solution_kappa_max(solution,endpoint,config))
         quality = validate_grid(checked,replace(solution,
             z_m=refined if name=='z' else solution.z_m,
             wavelengths_m=refined if name=='wavelength' else solution.wavelengths_m),config)
@@ -186,7 +189,8 @@ def run_bar(backend,config,bank,endpoint,solution,output,*,progress=None,source=
         from .profiles import target_profiles
         from .export import _coefficient_rows, _write_csv
         zz, ww = np.asarray(characterization['z_m']), np.asarray(characterization['wavelengths_m'])
-        targets = target_profiles(zz,config.device.length_m,endpoint.delta_beta_max_rad_per_m)
+        from .block_io import solution_kappa_max
+        targets = target_profiles(zz,config.device.length_m,endpoint.delta_beta_max_rad_per_m,solution_kappa_max(solution,endpoint,config))
         dense = replace(solution,z_m=zz,wavelengths_m=ww,cross_coefficients=decode_coefficients(characterization['cross']),
                         delta_target_rad_per_m=targets[0],kappa_target_rad_per_m=targets[1])
         rows = _coefficient_rows(dense,decode_coefficients(characterization['bar']),endpoint,config)
@@ -208,7 +212,8 @@ def run_propagation(config,bank,endpoint,solution,bar,output,*,progress=None,sou
         from .profiles import target_profiles
         validate_characterization(characterization, config, endpoint, solution)
         z, wavelengths = np.asarray(characterization['z_m']), np.asarray(characterization['wavelengths_m'])
-        targets = target_profiles(z, config.device.length_m, endpoint.delta_beta_max_rad_per_m)
+        from .block_io import solution_kappa_max
+        targets = target_profiles(z, config.device.length_m, endpoint.delta_beta_max_rad_per_m,solution_kappa_max(solution,endpoint,config))
         solution = replace(solution, z_m=z, wavelengths_m=wavelengths,
             delta_target_rad_per_m=targets[0], kappa_target_rad_per_m=targets[1],
             cross_coefficients=decode_coefficients(characterization['cross']))
