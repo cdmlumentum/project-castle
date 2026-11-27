@@ -446,6 +446,7 @@ def _add_solver_runtime_args(parser: argparse.ArgumentParser) -> None:
 def _main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="vlac")
     subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers.add_parser('check-lower-state', help='isolated sub-hour MODE test of state-independent lower-mode reuse')
     run = subparsers.add_parser("run", help="run endpoint search, optimize, propagate, export")
     run.add_argument("--config", default=str(DEFAULT_CONFIG))
     run.add_argument("--out", default=None)
@@ -880,6 +881,9 @@ def _main(argv: list[str] | None = None) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments and arguments[0] == 'check-lower-state':
+        from .lower_state_check import main as check_lower_state
+        return check_lower_state(arguments[1:])
     validators = {'validate-block1', 'validate-endpoint', 'validate-pso', 'validate-fde'}
     if not arguments or arguments[0] not in validators or any(v in arguments for v in ('--help','-h')):
         return _main(arguments)

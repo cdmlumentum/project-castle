@@ -1,5 +1,9 @@
 # Native MODE development and execution
 
+For an isolated, budgeted test of sharing lower-guide modes across liquid states,
+see [the sub-hour lower-state check](lower-state-check.md). It uses the native raw
+solver without enabling the approximation in the main workflow.
+
 The Python package supports a native Lumerical script calculation core and standalone MODE entry points for Blocks 1, 2 and 3. The calculation core preserves the v23 cross-section geometry, sampled material tables, transverse-field normalization, mode selection, detuning sign and complex coupling extraction. Implementation parity is checked separately from mesh convergence and physical device performance.
 
 ## Execution choices

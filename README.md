@@ -1,5 +1,9 @@
 # Vertical liquid-controlled adiabatic coupler workflow
 
+The separate [sub-hour lower-mode state-independence check](docs/methods/lower-state-check.md)
+tests sharing the lower mode between liquid states without changing production
+Blocks 2–3. Run `python tools/run_vlac.py check-lower-state --help` for its options.
+
 This project orchestrates cross-section simulations in Ansys Lumerical MODE/FDE from Python. It implements endpoint detuning search, Blackman-target minimax profile optimization, separate cross/bar coefficient extraction, two-mode propagation, wavelength-dependent IL/XT export, and validation hooks.
 
 This checkout includes local MODE integration and an optional native Lumerical script core. Start with [Native MODE development and execution](docs/methods/native-mode.md) for the implementation boundary, the runnable block scripts, and the comparison procedure. The original v23 source is recorded in [the import manifest](docs/legacy/v23-import.json).
