@@ -110,7 +110,7 @@ def export_mode_profiles(output, profiles, endpoint):
             if ex.shape != (len(x), len(y)) or ey.shape != ex.shape or not np.all(np.isfinite([ex, ey])):
                 raise ValueError("Invalid Block 1 mode profile fields or coordinate grid")
             relevant = [r for r in endpoint.endpoint_records if (packet["end"] == "both" or r["end"] == packet["end"])
-                        and ((packet["guide"] == "lower" and packet["end"] == "both") or r["state"] == packet["state"])
+                        and (packet.get("shared_states", packet["guide"] == "lower" and packet["end"] == "both") or r["state"] == packet["state"])
                         and np.isclose(r["wavelength_m"], packet["wavelength_m"], rtol=0, atol=1e-15)]
             beta = 2*np.pi*complex(np.asarray(mode["neff"]).squeeze())/packet["wavelength_m"]
             for row in relevant:
@@ -129,7 +129,7 @@ def export_mode_profiles(output, profiles, endpoint):
             ax = axes.flat[i]
             img = ax.pcolormesh(x*1e6, y*1e6, (intensity/max(float(intensity.max()), 1e-300)).T,
                                 shading="auto", cmap="inferno", vmin=0, vmax=1, rasterized=True)
-            state_label = 'both states' if packet['end'] == 'both' else packet['state']
+            state_label = 'both states' if packet.get('shared_states', packet['guide'] == 'lower' and packet['end'] == 'both') else packet['state']
             end_label = 'both ends' if packet['end'] == 'both' else packet['end']+' end'
             ax.set(xlabel="x (um)", ylabel="y (um)", title=f"{packet['guide']} | {end_label} | {state_label} | {packet['wavelength_m']*1e9:.0f} nm")
             fig.colorbar(img, ax=ax, label="Relative transverse intensity")

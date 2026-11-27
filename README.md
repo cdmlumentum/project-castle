@@ -10,6 +10,13 @@ This checkout includes local MODE integration and an optional native Lumerical s
 
 Use `python tools/run_vlac.py ...` to run this checkout explicitly; another `vlac` package may already be installed on this computer. `python tools/run_tests.py` likewise selects this checkout. Installation with `python -m pip install -e .` makes the `vlac` and `vlac-native` entry points available in the selected Python environment.
 
+The default/native/sweep configs use the [consistent retained-slab isolated
+reference](docs/methods/retained-slabs.md), `retained_slabs_v1`. Both continuous
+slabs remain when one ridge is removed; lower endpoint modes are computed
+separately in each liquid state. Old endpoint/profile handoffs are rejected
+under this reference and need fixed-geometry reverification. Missing reference
+fields and explicit legacy configs retain the historical behavior.
+
 `config/default.json` (also used when `--config` is omitted) and `config/native.json` now default to `sweep_anchored_v1`: linearly sweep width, select and freeze Blackman-target width anchors, then sweep signed lateral offset at those widths and select offset anchors. Shape-preserving PCHIP passes through the anchors; no Powell or clamped-spline fit is performed. See [the sweep method and runtime model](docs/methods/sweep-anchored.md). `config/python_joint.json` and `config/native_joint.json` retain the explicit joint-Powell paths. Saved/custom configurations keep their named method; their loading defaults are unchanged for compatibility. Original reference files are in [docs/references](docs/references/README.md).
 
 `config/native_sweep.json` explicitly selects the new method. `config/native_sequential.json` retains the [v0.26.4 sequential method](docs/changes/v26_4.md):
@@ -40,7 +47,7 @@ v23 explicitly sets the XY-plane FDE solver and near-max-index search, never cac
 
 ## Run each block independently (v22)
 
-Saved results can now be loaded between all four blocks. Your successful v21 endpoint folder can be used directly with matching configuration:
+Saved results can be loaded between all four blocks with matching configuration. The following examples require endpoints/profiles verified under the corrected reference. Historical v21 endpoints remain readable with matching legacy settings, such as `config/native_joint.json`; they cannot feed the corrected reference unchanged:
 
 ~~~powershell
 vlac validate-block2 --config config/default.json --endpoint-dir outputs/endpoint --out outputs/block2
@@ -169,7 +176,7 @@ Every directly solved input/output pair is compared without additional FDE solve
 
 Only directly solved, feasible pairs can win. Interpolation guides sampling and local stopping; it does not certify an unsampled global optimum. Feasibility and convergence are separate report fields. Failure distinguishes a missing sign-eligible width from a table containing both signs but no pair meeting the joint constraints. Bounds and tolerance remain unchanged.
 
-Final adaptive/PSO verification forces ten fresh mode solves (two lower and eight upper), bypassing both cache tiers. It repeats all mode, sign, width-order and balance checks and compares every signed detuning with the saved evaluation. A failed verification writes diagnostics and does not publish a best-result JSON. The report also lists each endpoint's residual from Block 2's common -D/+D target, since wavelength dispersion and the bar-state bottleneck can still prevent an exact target match.
+Final adaptive/PSO verification forces twelve fresh mode solves with retained-slab references (four lower and eight upper), or ten with the legacy shared-lower reference, bypassing both cache tiers. It repeats all mode, sign, width-order and balance checks and compares every signed detuning with the saved evaluation. A failed verification writes diagnostics and does not publish a best-result JSON. The report also lists each endpoint's residual from Block 2's common -D/+D target, since wavelength dispersion and the bar-state bottleneck can still prevent an exact target match.
 
 The selected widths remain fixed in Block 2. Its signed target is now `-D*cos(theta)`, progressing from negative input to positive output, while coupling remains `0.5*D*sin(theta)`. Endpoint width order does not impose monotonicity on every interior spline value.
 Run the new licensed smoke validation:
@@ -178,7 +185,7 @@ Run the new licensed smoke validation:
 vlac validate-endpoint --config config/default.json
 ~~~
 
-It uses five initial widths and a 13-width budget, then ten fresh verification solves. A passed report establishes execution and numerical agreement for a feasible sampled pair, including width order, signs, magnitude balance, reusable MODE layout and batched transfer paths. It does not establish global optimality, mesh/domain convergence, full-device performance or a measured speedup.
+It uses five initial widths and a 13-width budget, then twelve fresh verification solves with retained-slab references (ten with the legacy shared-lower reference). A passed report establishes execution and numerical agreement for a feasible sampled pair, including width order, signs, magnitude balance, reusable MODE layout and batched transfer paths. It does not establish global optimality, mesh/domain convergence, full-device performance or a measured speedup.
 
 The full workflow uses the same default:
 
@@ -209,7 +216,7 @@ For `vlac endpoint`, outputs default to `outputs/endpoint` (`--out` overrides). 
 Successful Block 1 runs also save these inspection outputs (including `block1`, `validate-block1`, and the Block 1 stage of `run`):
 
 - `endpoint_betas_linear.png` and `.pdf`: Re(beta) versus position over `device.length_m`, with one panel per band edge, cross/bar upper-guide curves, the lower-guide curve, and signed endpoint detunings. Dots are calculated endpoints; connecting lines are linear illustrations, not simulated interior beta values or the optimized Block 2 profile.
-- `endpoint_mode_profiles.npz`: selected isolated-mode complex normalized Ex/Ey arrays and x/y coordinates in metres. The adaptive and PSO paths retain the ten fresh verification modes (eight upper, two lower reused in both states), without extra isolated solves. These are fields on the tracking grid; raw Ez/H fields are not included.
+- `endpoint_mode_profiles.npz`: selected isolated-mode complex normalized Ex/Ey arrays and x/y coordinates in metres. The adaptive and PSO paths retain twelve fresh verification modes for retained-slab references (eight upper and four state-specific lower), or ten for the legacy shared-lower reference, without extra isolated solves. These are fields on the tracking grid; raw Ez/H fields are not included.
 - `endpoint_mode_profiles.png`: a visual overview of the transverse mode intensities, each scaled to its own peak.
 - `endpoint_inspection.lms`: one solved full-domain, two-guide input cross-section in the cross state at the minimum wavelength. Opening it in MODE restores the geometry, materials, FDE settings and available solved mode data. This is one transverse section, not a longitudinal device model. Creating it adds one coupled FDE solve call with the configured production settings, independent of `output.save_solver_projects`.
 - `endpoint_diagnostics.json`: mode array keys, identities, effective indices, geometry, coordinate frames, inspection-project selection and validation scope. Load the NPZ with `numpy.load(path, allow_pickle=False)` and use each mode's `array_prefix` to find `_ex`, `_ey`, `_x_m`, and `_y_m`.

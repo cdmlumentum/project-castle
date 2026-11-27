@@ -42,3 +42,14 @@ Use a short, stable ID such as `REF-001`. In **Relevance to workflow**, name the
 - REF-002 and REF-004 motivate sequential width/detuning then separation/coupling
   design. The finite-grid minimax path, table checks and PCHIP representation are
   explicitly named project alternatives, not algorithms claimed from those papers.
+
+## Consistent slab reference (v0.27.1, 2026-11-27)
+
+- REF-016: local MODE background diagnostic, 56 fresh solves, November 27, 2026:
+  `outputs/block2_checkout/diagnostics/block2_negative_kappa_validation_20261127_run01/validation_report.md`
+  in the original project workspace. Matched slab backgrounds remove the large
+  endpoint extraction residual in the tested sections. Subsequent numerical
+  study `outputs/block2_checkout/diagnostics/mesh_study_20261127_run02/report.md`
+  completed 120 solves but failed the vertical mesh gate. Current as diagnostic
+  evidence; neither convergence certification nor physical validation.
+  [Implementation and validation boundary](../methods/retained-slabs.md).

@@ -1,5 +1,12 @@
 # Native MODE development and execution
 
+The default configs now select the named `retained_slabs_v1` isolated reference:
+both slabs remain and only the other ridge is removed. Lower endpoint modes are
+computed separately by liquid state. Historical handoffs require matching
+legacy reference settings; they cannot feed this corrected reference unchanged.
+See [the reference correction](retained-slabs.md) for evidence, compatibility,
+standalone restrictions and the capped licensed parity check.
+
 For an isolated, budgeted test of sharing lower-guide modes across liquid states,
 see [the sub-hour lower-state check](lower-state-check.md). It uses the native raw
 solver without enabling the approximation in the main workflow.

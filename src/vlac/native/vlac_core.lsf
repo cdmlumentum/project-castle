@@ -6,6 +6,17 @@ function vlac_empty_refs() {
     result=struct; result.n=0; result.items=cell(1); return result;
 }
 
+function vlac_component_enabled(cfg,name,upper_enabled,lower_enabled) {
+    if ((name=="upper_slab")|(name=="lower_slab")) {
+        if (isfield(cfg,"retain_both_slabs")) {
+            if (cfg.retain_both_slabs) { return 1; }
+        }
+    }
+    if ((name=="upper_slab")|(name=="upper_ridge")) { return upper_enabled; }
+    if ((name=="lower_slab")|(name=="lower_ridge")) { return lower_enabled; }
+    return 1;
+}
+
 function vlac_overlap(first,second) {
     numerator=sum(conj(first.ex)*second.ex+conj(first.ey)*second.ey);
     norm_a=sum(abs(first.ex)^2+abs(first.ey)^2);
@@ -96,8 +107,8 @@ function vlac_raw(cfg,geometry,wavelength,upper_enabled,lower_enabled,compact) {
         vlac_rectangle("buried_oxide_and_gap",silica,0,(ymin+upper_y)/2,xspan,upper_y-ymin,1);
         vlac_rectangle("upper_liquid_cladding",liquid,0,(upper_y+ymax)/2,xspan,ymax-upper_y,1);
         if (geometry.h_rib_m>0) {
-            vlac_rectangle("lower_slab",nitride,0,geometry.h_rib_m/2,xspan,geometry.h_rib_m,lower_enabled);
-            vlac_rectangle("upper_slab",nitride,0,upper_y+geometry.h_rib_m/2,xspan,geometry.h_rib_m,upper_enabled);
+            vlac_rectangle("lower_slab",nitride,0,geometry.h_rib_m/2,xspan,geometry.h_rib_m,vlac_component_enabled(cfg,"lower_slab",upper_enabled,lower_enabled));
+            vlac_rectangle("upper_slab",nitride,0,upper_y+geometry.h_rib_m/2,xspan,geometry.h_rib_m,vlac_component_enabled(cfg,"upper_slab",upper_enabled,lower_enabled));
         }
         if (geometry.h_rib_m==0) {
             if (getnamednumber("lower_slab")>0) { select("lower_slab"); delete; }

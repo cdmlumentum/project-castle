@@ -7,7 +7,8 @@
     "hide_gui": true,
     "tracking_method": "guarded_translation_v1",
     "tracking_recovery_depth": 3,
-    "endpoint_domain_policy": "strict"
+    "endpoint_domain_policy": "strict",
+    "isolated_reference": "retained_slabs_v1"
   },
   "optimizer": {
     "method": "sweep_anchored_v1",
@@ -19,5 +20,8 @@
   "output": {
     "directory": "outputs/native_sweep",
     "cache_sqlite": "outputs/native_sweep/cache/native_fde_cache.sqlite"
+  },
+  "endpoint_search": {
+    "pso_lower_mode_state_independent": false
   }
 }

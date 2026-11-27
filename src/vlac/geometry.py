@@ -48,6 +48,17 @@ class Rectangle:
     y_span_m: float
 
 
+def component_enabled(name, include_upper, include_lower, isolated_reference):
+    """Only ridges are removed in the common-background reference alternative."""
+    if name in {"upper_slab", "lower_slab"} and isolated_reference == "retained_slabs_v1":
+        return True
+    if name in {"upper_slab", "upper_ridge"}:
+        return bool(include_upper)
+    if name in {"lower_slab", "lower_ridge"}:
+        return bool(include_lower)
+    return True
+
+
 def make_geometry(
     config: GeometryConfig,
     *,

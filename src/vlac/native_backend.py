@@ -125,6 +125,7 @@ class NativeLumapiBackend(LumapiBackend):
             knots = np.atleast_1d(table["wavelength_um"]) * 1e-6
             liquid_knots = np.unique(np.r_[wavelengths, knots[(knots >= wavelengths[0]) & (knots <= wavelengths[-1])]])
         payload = {
+            "retain_both_slabs": float(cfg.solver.isolated_reference == "retained_slabs_v1"),
             "reuse_scene": float(cfg.solver.reuse_mode_project),
             "x_span_m": self.x_span_m, "y_min_m": self.y_min_m, "y_max_m": self.y_max_m,
             "mesh_cells_x": float(nx), "mesh_cells_y": float(ny),

@@ -497,10 +497,10 @@ class LumapiBackend:
         return complex(arr.item())
 
     def _active_rectangles(self, geometry, include_upper, include_lower):
+        from .geometry import component_enabled
         return [rect for rect in rectangles_for_cross_section(
             geometry, x_span_m=self.x_span_m, y_min_m=self.y_min_m, y_max_m=self.y_max_m
-        ) if not ((rect.name.startswith("upper_") and rect.name != "upper_liquid_cladding" and not include_upper)
-                  or (rect.name.startswith("lower_") and not include_lower))]
+        ) if component_enabled(rect.name, include_upper, include_lower, self.config.solver.isolated_reference)]
 
     def _raw_mode_candidates(self, geometry, wavelength_m, *, include_upper, include_lower,
                              mesh_accuracy=None, mesh_cells_override=None, use_cache=True):
@@ -616,10 +616,10 @@ class LumapiBackend:
         # rebuild layout objects only, then resume incremental updates.
         rebuild = not ready or names != getattr(self, "_layout_names", ())
         lines = ["selectall; delete;"] if ready and rebuild else []
+        from .geometry import component_enabled
         for rect in rectangles:
             mat = liquid if rect.material == "Liquid" else rect.material
-            enabled = not ((rect.name.startswith("lower_") and not include_lower)
-                           or (rect.name in {"upper_slab", "upper_ridge"} and not include_upper))
+            enabled = component_enabled(rect.name, include_upper, include_lower, self.config.solver.isolated_reference)
             if rebuild:
                 lines.append(f'addrect; set("name","{rect.name}");')
             # Layout updates are always made in layout mode, outside analysis groups.
@@ -899,7 +899,7 @@ vlac_mode_data.cards=vlac_cards;
 
     def _selection_signature(self) -> dict:
         return {name: getattr(self.config.solver, name) for name in (
-            "minimum_te_fraction", "minimum_mode_overlap", "field_overlap_crosscheck_max_basis_overlap"
+            "minimum_te_fraction", "minimum_mode_overlap", "field_overlap_crosscheck_max_basis_overlap", "isolated_reference"
         )}
 
     def _material_signature(self) -> dict:
@@ -959,8 +959,8 @@ vlac_mode_data.cards=vlac_cards;
             )
             for ref in references
         )
-        # For isolated modes, the other guide's SiN is omitted while the shared
-        # oxide/liquid background regions remain. The bottom half-space is silica.
+        # The configured reference removes either the other entire guide (v23)
+        # or only its ridge while retaining both slabs. The host is unchanged.
         upper_modes = self._raw_mode_candidates(
             geometry,
             wavelength_m,

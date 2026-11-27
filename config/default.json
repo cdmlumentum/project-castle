@@ -94,7 +94,8 @@
     "reuse_mode_project": true,
     "batch_mode_data": true,
     "raw_cache_memory_entries": 16,
-    "zero_mode_retries": 1
+    "zero_mode_retries": 1,
+    "isolated_reference": "retained_slabs_v1"
   },
   "optimizer": {
     "method": "sweep_anchored_v1",
@@ -120,7 +121,7 @@
     "pso_cognitive": 1.49618,
     "pso_social": 1.49618,
     "pso_velocity_limit": 0.2,
-    "pso_lower_mode_state_independent": true,
+    "pso_lower_mode_state_independent": false,
     "pso_guided_neff_margin": 1e-05,
     "adaptive_initial_widths": 9,
     "adaptive_max_widths": 33,

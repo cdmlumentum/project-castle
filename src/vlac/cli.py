@@ -488,7 +488,7 @@ def _main(argv: list[str] | None = None) -> int:
     validate_pso.add_argument("--config", default=str(DEFAULT_CONFIG))
     validate_pso.add_argument("--out", default=None)
     _add_solver_runtime_args(validate_pso)
-    validate_endpoint = subparsers.add_parser("validate-endpoint", help="run a small adaptive width search with ten fresh verification solves")
+    validate_endpoint = subparsers.add_parser("validate-endpoint", help="run a small adaptive width search with fresh endpoint verification solves")
     validate_endpoint.add_argument("--config", default=str(DEFAULT_CONFIG))
     validate_endpoint.add_argument("--out", default=None)
     _add_solver_runtime_args(validate_endpoint)
@@ -803,17 +803,19 @@ def _main(argv: list[str] | None = None) -> int:
                 "validation_method": "adaptive_1d" if adaptive else "python_pso",
             },
         )
-        progress.set_plan(["MODE API/license preflight", "Precompute state-independent lower-guide modes",
+        progress.set_plan(["MODE API/license preflight", "Precompute lower-guide modes",
                            "Endpoint detuning search", verify_stage])
         progress.checkpoint("configuration", config.as_dict())
         report = {
             "command": f"vlac {args.command}",
             "status": "running",
-            "validation_scope": ("adaptive width search with five initial samples and a 13-width budget, plus ten fresh verification modes"
-                                 if adaptive else "one-generation constrained Python PSO with ten fresh final mode solves"),
+            "validation_scope": ("adaptive width search with five initial samples and a 13-width budget, plus fresh endpoint verification"
+                                 if adaptive else "one-generation constrained Python PSO with fresh final mode solves"),
             "cross_state_sign_requirement": dict(CROSS_STATE_SIGN_REQUIREMENT),
             "edge_wavelength_assumption": "only wavelength_min_m and wavelength_max_m are used by the endpoint objective",
-            "lower_mode_assumption": "one cross-state lower-guide mode per band edge is reused in both liquid states",
+            "lower_mode_assumption": ("one cross-state lower-guide mode per band edge is reused in both liquid states"
+                                      if config.endpoint_search.pso_lower_mode_state_independent
+                                      else "one lower-guide mode per liquid state and band edge; no cross-state reuse"),
         }
         try:
             with _backend(

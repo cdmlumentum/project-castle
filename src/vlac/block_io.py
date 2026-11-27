@@ -63,6 +63,9 @@ def physics_signature(config, block):
                  'solver': {k:raw['solver'][k] for k in solver_keys},
                  'endpoint_constraints': {k:raw['endpoint_search'][k] for k in endpoint_keys},
                  'wavelength_bounds_m': [config.device.wavelength_min_m,config.device.wavelength_max_m]}
+    # Keep legacy signatures readable, but never mix the two reference physics.
+    if config.solver.isolated_reference != 'removed_guide_v23':
+        signature['isolated_reference'] = config.solver.isolated_reference
     if config.solver.calibration is not None:
         signature['block0_certificate_id'] = config.solver.calibration['certificate_id']
     if block>=2:

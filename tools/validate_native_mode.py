@@ -4,6 +4,7 @@ from dataclasses import asdict, replace
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -257,10 +258,90 @@ def native_cache_checks(config, output):
     return comparison
 
 
+def slab_reference_checks(config, output, endpoint_dir):
+    """At most twelve actual FDE solves at the unchanged saved output geometry.
+
+    This consumes an old handoff only as validated geometry evidence. It does
+    not migrate its betas, publish a new endpoint, or optimize any dimension.
+    """
+    from vlac.block_io import physics_signature, coefficient_data
+    from vlac.config import config_from_dict
+    from vlac.runtime import resolve_published
+    from vlac.geometry import component_enabled
+    from vlac.coefficient_stability import compare_coefficients
+    if config.solver.isolated_reference != 'retained_slabs_v1':
+        raise ValueError('The slab-reference check requires retained_slabs_v1.')
+    folder = resolve_published(endpoint_dir)
+    saved = config_from_dict(json.loads((folder/'configuration.json').read_text(encoding='utf-8')), project_root=ROOT)
+    endpoint, _, _, source = load_block(folder, 1, saved)
+    old, new = physics_signature(saved, 1), physics_signature(config, 1)
+    for key in ('geometry', 'materials', 'wavelength_bounds_m'):
+        if old[key] != new[key]:
+            raise ValueError('Diagnostic geometry/material/band differs from the saved endpoint: '+key)
+    values, results = {}, {}
+    started = time.monotonic()
+    for name, cls in (('python', LumapiBackend), ('native', NativeLumapiBackend)):
+        remaining = min(1200., config.execution.max_seconds or 1200.)-(time.monotonic()-started)
+        if remaining <= 0:
+            raise RuntimeError('Slab-reference wall-time budget exhausted.')
+        local = replace(config,
+            solver=replace(config.solver, zero_mode_retries=0),
+            execution=replace(config.execution, max_solves=min(6, (config.execution.max_solves or 12)//2),
+                              max_seconds=remaining, native_batch_size=1, resume=False))
+        with cls(local) as backend:
+            if name == 'native':
+                load_native_functions(backend.session, 'vlac_core.lsf')
+                flags = []
+                for retain in (False, True):
+                    backend.session.putv('vlac_reference_cfg', {'retain_both_slabs': float(retain)})
+                    for upper, lower in ((False, False), (True, False), (False, True), (True, True)):
+                        names = ('upper_slab', 'lower_slab', 'upper_ridge', 'lower_ridge')
+                        expressions = [f'vlac_component_enabled(vlac_reference_cfg,"{n}",{int(upper)},{int(lower)})' for n in names]
+                        backend.session.eval('vlac_reference_flags=['+','.join(expressions)+'];')
+                        actual = np.asarray(backend.session.getv('vlac_reference_flags')).reshape(-1)
+                        reference = 'retained_slabs_v1' if retain else 'removed_guide_v23'
+                        expected = [component_enabled(n, upper, lower, reference) for n in names]
+                        flags.append(bool(np.array_equal(actual, expected)))
+                results['native_component_flags_match_python'] = all(flags)
+            packets = []
+            for wavelength in endpoint.wavelengths_m:
+                geometry = make_geometry(config.geometry, w1_m=endpoint.w1_output_m,
+                    h_gap_m=endpoint.h_gap_m, h_rib_m=endpoint.h_rib_m,
+                    d_c2c_m=config.geometry.d_c2c_output_m, state='cross',
+                    liquid_index=float(backend.bank.liquid_cross.index(wavelength)))
+                print(f'{name} retained-slab output at {wavelength*1e9:.0f} nm', flush=True)
+                c, ref = backend.evaluate_coefficients(geometry, float(wavelength))
+                packets.append((c, ref))
+            values[name] = packets
+            results[name] = {'fresh_fde_solves': backend.budget.solves,
+                             'coefficients': coefficient_data([[c for c, _ in packets]])[0]}
+    comparisons = []
+    for wavelength, (python_value, python_ref), (native_value, native_ref) in zip(
+            endpoint.wavelengths_m, values['python'], values['native']):
+        comparison = compare_coefficients(config, native_value, python_value, float(wavelength))
+        overlaps = [field_overlap(a,b) for a,b in zip(
+            (python_ref.upper, python_ref.lower, *python_ref.supermodes),
+            (native_ref.upper, native_ref.lower, *native_ref.supermodes))]
+        zero_scale = config.convergence.phase_error_rad/config.device.length_m
+        comparison.update(wavelength_m=float(wavelength), field_overlaps=overlaps,
+                          endpoint_kappa_small=bool(max(abs(python_value.kappa),abs(native_value.kappa)) <= zero_scale))
+        comparison['passed'] &= min(overlaps) >= config.convergence.minimum_power_overlap**.5 and comparison['endpoint_kappa_small']
+        comparisons.append(comparison)
+    results.update(comparisons=comparisons,
+        fixed_geometry={'w1_output_m': endpoint.w1_output_m, 'd_c2c_output_m': config.geometry.d_c2c_output_m,
+                        'h_gap_m': endpoint.h_gap_m, 'h_rib_m': endpoint.h_rib_m},
+        source_endpoint_sha256=source['sha256'], elapsed_seconds=time.monotonic()-started,
+        passed=results['native_component_flags_match_python'] and all(c['passed'] for c in comparisons),
+        scope='Two cross-state output band-edge sections: implementation parity and small residual coupling only. No endpoint migration, optimization, mesh/domain convergence or physical validation.')
+    return results
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--math-only", action="store_true")
     parser.add_argument("--cache-only", action="store_true")
+    parser.add_argument("--slab-reference-only", action="store_true")
+    parser.add_argument("--endpoint-dir", type=Path)
     parser.add_argument("--max-solves", type=int, default=24)
     parser.add_argument("--max-seconds", type=float, default=900)
     parser.add_argument("--config", default=str(ROOT / "config/python_joint.json"))
@@ -273,8 +354,20 @@ def main():
     report = {"status": "failed", "started_utc": datetime.now(timezone.utc).isoformat(),
               "scope": "Numerical implementation parity; no mesh convergence or full-device performance claim",
               "configuration": config.as_dict()}
+    from vlac.provenance import artifact_identity
+    report['provenance'] = artifact_identity(config)
+    report['validation_script_sha256'] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
     started = time.perf_counter()
     try:
+        if args.slab_reference_only:
+            if args.endpoint_dir is None:
+                raise ValueError('--slab-reference-only requires --endpoint-dir.')
+            report['slab_reference'] = slab_reference_checks(config, output, args.endpoint_dir)
+            report['status'] = 'passed' if report['slab_reference']['passed'] else 'failed'
+            report['elapsed_seconds'] = time.perf_counter()-started
+            write_json(output/'comparison.json', report)
+            print('Slab reference check: '+report['status'], flush=True)
+            return 0 if report['status']=='passed' else 1
         if args.cache_only:
             report['cache_reuse'] = native_cache_checks(config, output)
             report['status'] = 'passed' if report['cache_reuse']['passed'] else 'failed'

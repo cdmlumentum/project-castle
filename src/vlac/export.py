@@ -389,7 +389,7 @@ def export_run(
             "compact_x_domain": config.solver.endpoint_compact_x,
             "lower_mode_state_independence_assumption": (
                 "cross-state lower-guide modes computed once per band edge and reused in both liquid states"
-                if endpoint.search_method in {"python_pso", "adaptive_1d"}
+                if endpoint.search_method in {"python_pso", "adaptive_1d"} and config.endpoint_search.pso_lower_mode_state_independent
                 else "lower-guide mode solved in each liquid-state sample"
             ),
             "pso_summary": endpoint.pso_summary,

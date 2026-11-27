@@ -38,7 +38,7 @@ class WidthEvaluator(EndpointEvaluator):
                 self.check_mode(mode, overlap, previous, geometry, wavelength, "upper")
                 previous = mode
                 snapshots[(state, wavelength)] = mode
-                lower, lower_overlap = self.lower_modes[wavelength]
+                lower, lower_overlap = self.lower_mode(state, wavelength)
                 upper_beta, lower_beta = 2*np.pi*mode.neff/wavelength, 2*np.pi*lower.neff/wavelength
                 signed = upper_beta - lower_beta
                 rows.append({
@@ -204,7 +204,7 @@ def search_endpoints_adaptive(backend, config, bank, *, progress=None, output_di
         raise ValueError("adaptive_1d requires endpoint_compact_x=true for the common centered width table.")
     if g.h_gap_bounds_m[0] != g.h_gap_bounds_m[1] or g.h_rib_bounds_m[0] != g.h_rib_bounds_m[1]:
         raise ValueError("adaptive_1d requires fixed h_gap and h_rib.")
-    if settings.pso_lower_mode_state_independent is not True:
+    if settings.pso_lower_mode_state_independent is not True and config.solver.isolated_reference == 'removed_guide_v23':
         raise ValueError("adaptive_1d uses the configured state-independent lower-mode assumption.")
     if validation_only:
         settings = replace(settings,adaptive_initial_widths=5,adaptive_max_widths=13)
@@ -233,7 +233,7 @@ def search_endpoints_adaptive(backend, config, bank, *, progress=None, output_di
         evaluator.snapshots = saved['snapshots']
         evaluator.lower_modes = saved['lower_modes']
     if progress:
-        progress.start_stage("Precompute state-independent lower-guide modes",total=2,unit="band-edge modes")
+        progress.start_stage("Precompute lower-guide modes",total=2*len(evaluator.lower_states),unit="state/band-edge modes")
     if not evaluator.lower_modes: evaluator.precompute_lower()
     if progress:
         progress.finish_stage()
@@ -332,7 +332,7 @@ def search_endpoints_adaptive(backend, config, bank, *, progress=None, output_di
                "convergence_scope": "interpolation-guided local pair stability; no unsampled global-optimum guarantee",
                "stop_reason": "width_and_objective_tolerance" if converged else "width_budget_or_local_refinement_limit",
                "width_bounds_m": [g.w1_min_m,g.w1_max_m],"width_bounds_adjusted": False,"cutoff_preflight": False,
-               "lower_mode_state_independent": True,"silicon_substrate_included": False,
+               "lower_mode_state_independent": settings.pso_lower_mode_state_independent,"silicon_substrate_included": False,
                "slab_lateral_extent": "both FDE x boundaries",
                "input_feasible_samples": sum(s["valid"] and s["eligible_end"]=="input" for s in samples.values()),
                "output_feasible_samples": sum(s["valid"] and s["eligible_end"]=="output" for s in samples.values()),
@@ -348,7 +348,7 @@ def search_endpoints_adaptive(backend, config, bank, *, progress=None, output_di
                            "Width bounds and balance tolerance were not changed; this sampled result does not prove the interval infeasible.")
     if progress:
         progress.finish_stage(f"{len(samples)} widths; constrained endpoint pair selected")
-        progress.start_stage("Verify adaptive endpoint best candidate",total=10,unit="fresh FDE mode solves")
+        progress.start_stage("Verify adaptive endpoint best candidate",total=evaluator.fresh_verification_solves,unit="fresh FDE mode solves")
     verification = {"status": "running","fresh_fde_solves": True}
     try:
         evaluator.precompute_lower(use_cache=False)
@@ -358,7 +358,7 @@ def search_endpoints_adaptive(backend, config, bank, *, progress=None, output_di
         errors = [abs(a["delta_beta_real_rad_per_m"]-b["delta_beta_real_rad_per_m"]) for a,b in zip(records,expected)]
         agrees = all(np.isclose(a["delta_beta_real_rad_per_m"],b["delta_beta_real_rad_per_m"],rtol=1e-6,atol=1e-3)
                      for a,b in zip(records,expected))
-        verification.update(status="passed" if agrees else "failed",fresh_mode_solves=10,endpoint_records=records,
+        verification.update(status="passed" if agrees else "failed",fresh_mode_solves=evaluator.fresh_verification_solves,endpoint_records=records,
                             endpoint_constraint_verification=constraints,cross_state_sign_verification=constraints["cross_state_sign_verification"],
                             maximum_case_error_rad_per_m=max(errors),absolute_tolerance_rad_per_m=1e-3,relative_tolerance=1e-6)
         if not agrees: raise RuntimeError("Fresh endpoint FDE detunings disagree with the adaptive width table.")
@@ -376,7 +376,7 @@ def search_endpoints_adaptive(backend, config, bank, *, progress=None, output_di
                    w1_input_m=float(best["widths"][0]),w1_output_m=float(best["widths"][1]))
     _write_json(out/"endpoint_adaptive_best.json",summary)
     _write_json(out/"endpoint_adaptive_summary.json",summary)
-    if progress: progress.finish_stage("ten fresh FDE solves; width order, signs and magnitude balance verified")
+    if progress: progress.finish_stage(f"{evaluator.fresh_verification_solves} fresh FDE solves; width order, signs and magnitude balance verified")
     return EndpointSearchResult(g.h_gap_bounds_m[0],g.h_rib_bounds_m[0],float(best["widths"][0]),float(best["widths"][1]),score,
                                 np.asarray(evaluator.wavelengths),records,pairs,converged,history,
                                 backend.endpoint_isolated_domain_info(),search_method="adaptive_1d",search_summary=summary)

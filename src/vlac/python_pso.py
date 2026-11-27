@@ -177,6 +177,18 @@ class EndpointEvaluator:
         self.wavelengths = [config.device.wavelength_min_m, config.device.wavelength_max_m]
         self.lower_modes: dict = {}
 
+    @property
+    def lower_states(self):
+        return ("cross",) if self.config.endpoint_search.pso_lower_mode_state_independent else ("cross", "bar")
+
+    @property
+    def fresh_verification_solves(self):
+        return 8 + 2*len(self.lower_states)
+
+    def lower_mode(self, state, wavelength):
+        key = wavelength if len(self.lower_states) == 1 else (state, wavelength)
+        return self.lower_modes[key]
+
     def geometry(self, width, offset, state, wavelength):
         g = self.config.geometry
         liquid = self.bank.liquid_cross if state == "cross" else self.bank.liquid_bar
@@ -201,22 +213,26 @@ class EndpointEvaluator:
     def precompute_lower(self, *, use_cache=True):
         if not use_cache:
             self.mode_profiles = []
-        previous = None
         result = {}
-        for index, wavelength in enumerate(self.wavelengths, 1):
-            geometry = self.geometry(self.config.geometry.w1_min_m, 0.0, "cross", wavelength)
-            mode, overlap = self.backend.solve_isolated_mode(
-                geometry, wavelength, guide="lower", reference=previous,
-                compact_x=self.config.solver.endpoint_compact_x, use_cache=use_cache,
-            )
-            self.check_mode(mode, overlap, previous, geometry, wavelength, "lower")
-            if not use_cache:
-                from .endpoint_diagnostics import profile_packet
-                self.mode_profiles.append(profile_packet(self.backend, mode, geometry, wavelength, "lower", "both"))
-            previous = mode
-            result[wavelength] = (mode, overlap)
-            if self.progress:
-                self.progress.update(index, detail=f"lower guide {wavelength*1e9:.0f} nm")
+        for state in self.lower_states:
+            previous = None
+            for wavelength in self.wavelengths:
+                geometry = self.geometry(self.config.geometry.w1_min_m, 0.0, state, wavelength)
+                mode, overlap = self.backend.solve_isolated_mode(
+                    geometry, wavelength, guide="lower", reference=previous,
+                    compact_x=self.config.solver.endpoint_compact_x, use_cache=use_cache,
+                )
+                self.check_mode(mode, overlap, previous, geometry, wavelength, "lower")
+                if not use_cache:
+                    from .endpoint_diagnostics import profile_packet
+                    packet = profile_packet(self.backend, mode, geometry, wavelength, "lower", "both")
+                    packet['shared_states'] = len(self.lower_states) == 1
+                    self.mode_profiles.append(packet)
+                previous = mode
+                key = wavelength if len(self.lower_states) == 1 else (state, wavelength)
+                result[key] = (mode, overlap)
+                if self.progress:
+                    self.progress.update(len(result), detail=f"lower guide {state} {wavelength*1e9:.0f} nm")
         self.lower_modes = result
 
     def evaluate(self, widths, *, use_cache=True):
@@ -243,7 +259,7 @@ class EndpointEvaluator:
                     except InvalidModeError as exc:
                         raise InvalidModeError(f"{context}: {exc}") from exc
                     previous = upper
-                    lower, lower_overlap = self.lower_modes[wavelength]
+                    lower, lower_overlap = self.lower_mode(state, wavelength)
                     beta_upper, beta_lower = 2*np.pi*upper.neff/wavelength, 2*np.pi*lower.neff/wavelength
                     signed = beta_upper - beta_lower
                     records.append({
@@ -261,7 +277,7 @@ class EndpointEvaluator:
                         "upper_tracking_overlap": float(overlap), "lower_tracking_overlap": float(lower_overlap),
                     })
                     if self.progress and not use_cache:
-                        self.progress.update(2 + len(records), detail=context)
+                        self.progress.update(len(self.lower_modes) + len(records), detail=context)
         require_endpoint_constraints(records, self.config.endpoint_search)
         return min(abs(r["delta_beta_real_rad_per_m"]) for r in records), records
 
@@ -276,7 +292,7 @@ def search_endpoints_python_pso(
     g, settings = config.geometry, config.endpoint_search
     if g.h_gap_bounds_m[0] != g.h_gap_bounds_m[1] or g.h_rib_bounds_m[0] != g.h_rib_bounds_m[1]:
         raise ValueError("Endpoint Python PSO requires fixed h_gap and h_rib bounds.")
-    if settings.pso_lower_mode_state_independent is not True:
+    if settings.pso_lower_mode_state_independent is not True and config.solver.isolated_reference == 'removed_guide_v23':
         raise ValueError("Endpoint Python PSO requires state-independent lower modes.")
     if validation_only:
         settings = replace(settings, pso_generation_size=3, pso_max_generations=1, pso_tolerance=0.0)
@@ -293,7 +309,7 @@ def search_endpoints_python_pso(
         (out / name).write_text("", encoding="utf-8")
     evaluator = EndpointEvaluator(backend, config, bank, progress=progress)
     if progress:
-        progress.start_stage("Precompute state-independent lower-guide modes", total=2, unit="band-edge modes")
+        progress.start_stage("Precompute lower-guide modes", total=2*len(evaluator.lower_states), unit="state/band-edge modes")
     evaluator.precompute_lower()
     if progress:
         progress.finish_stage()
@@ -372,8 +388,8 @@ def search_endpoints_python_pso(
     )
     if progress:
         progress.finish_stage(f"{result.evaluations} particles in {result.generations} generations")
-        progress.start_stage("Verify Python PSO best candidate", total=10, unit="fresh FDE mode solves")
-    # Force all ten final mode calculations to bypass SQLite. Recompute signed
+        progress.start_stage("Verify Python PSO best candidate", total=evaluator.fresh_verification_solves, unit="fresh FDE mode solves")
+    # Force all final mode calculations to bypass SQLite. Recompute signed
     # detunings and compare each case with the optimizer's saved evaluation.
     verification = {"status": "running", "fresh_fde_solves": True,
                     "relative_tolerance": 1e-6, "absolute_tolerance_rad_per_m": 1e-3}
@@ -402,7 +418,7 @@ def search_endpoints_python_pso(
     _write_json(out / "endpoint_pso_verification.json", verification)
     backend._block1_mode_profiles = evaluator.mode_profiles
     if progress:
-        progress.finish_stage("ten fresh FDE mode solves and all eight detunings verified")
+        progress.finish_stage(f"{evaluator.fresh_verification_solves} fresh FDE mode solves and all eight detunings verified")
     summary = {
         "backend": "python_pso", "generation_size": settings.pso_generation_size,
         "generations_completed": result.generations, "max_generations": settings.pso_max_generations,
@@ -410,7 +426,7 @@ def search_endpoints_python_pso(
         "stop_reason": "tolerance" if result.converged else "generation_limit",
         "random_seed": settings.pso_random_seed, "width_bounds_m": [g.w1_min_m, g.w1_max_m],
         "width_bounds_adjusted": False, "cutoff_preflight": False,
-        "lower_mode_state_independent": True, "silicon_substrate_included": False,
+        "lower_mode_state_independent": settings.pso_lower_mode_state_independent, "silicon_substrate_included": False,
         "cross_state_sign_requirement": dict(CROSS_STATE_SIGN_REQUIREMENT),
         "cross_state_endpoint_signs_verified": True,
         "endpoint_constraints_verified": True,

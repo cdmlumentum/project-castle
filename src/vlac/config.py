@@ -76,6 +76,8 @@ class MaterialsConfig:
 @dataclass
 class SolverConfig:
     engine: str = "python"
+    # Missing fields in saved/custom configs retain the historical reference.
+    isolated_reference: str = "removed_guide_v23"
     api_path: str | None = "C:/Program Files/Lumerical/v221/api/python"
     threads: int = 2
     hide_gui: bool = False
@@ -308,6 +310,10 @@ class WorkflowConfig:
                 raise ValueError(f'solver.{name} must be an integer >= 2.')
         if s.engine not in {"python", "native"}:
             raise ValueError("solver.engine must be python or native.")
+        if s.isolated_reference not in {"removed_guide_v23", "retained_slabs_v1"}:
+            raise ValueError("Unknown solver.isolated_reference.")
+        if s.isolated_reference == "retained_slabs_v1" and e.pso_lower_mode_state_independent:
+            raise ValueError("retained_slabs_v1 requires pso_lower_mode_state_independent=false: the retained upper slab can transmit liquid-state sensitivity to the lower mode.")
         if s.tracking_grid_nx < 16 or s.tracking_grid_ny < 16:
             raise ValueError("The common field-overlap grid is too small.")
         if o.control_points < 4:
@@ -391,7 +397,8 @@ class WorkflowConfig:
             or not isinstance(e.pso_random_seed, int) or e.pso_random_seed < 0
         ):
             raise ValueError("pso_random_seed must be a nonnegative integer or null.")
-        if e.method in {"adaptive_1d", "python_pso"} and e.pso_lower_mode_state_independent is not True:
+        if (e.method in {"adaptive_1d", "python_pso"} and not e.pso_lower_mode_state_independent
+                and s.isolated_reference == "removed_guide_v23"):
             raise ValueError(
                 "Adaptive/PSO endpoint search uses state-independent lower modes; choose python_grid "
                 "to solve lower modes separately in each liquid state."

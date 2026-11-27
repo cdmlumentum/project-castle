@@ -57,6 +57,8 @@ def _endpoint_packet(endpoint):
 
 def prepare_bundle(config, output, *, endpoint_dir=None, profile_dir=None, width_samples=None):
     config.validate()
+    if config.solver.isolated_reference != 'removed_guide_v23':
+        raise ValueError('retained_slabs_v1 requires package block commands; standalone Block 1 assumes a shared lower mode across liquid states.')
     if config.solver.tracking_method != 'legacy' or config.optimizer.method != 'bounded_powell':
         raise ValueError('Guarded tracking, sequential fitting and sweep anchors require tools/run_vlac.py block2 with the native backend; standalone coordinate_pattern is a different method.')
     g, e, o, d = config.geometry, config.endpoint_search, config.optimizer, config.device
