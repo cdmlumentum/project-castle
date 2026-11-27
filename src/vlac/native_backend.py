@@ -326,18 +326,22 @@ class NativeLumapiBackend(LumapiBackend):
             self.cache.put(key, result, kind="native_coefficients")
         return result
 
-    def _guarded_coefficients(self, geometry, wavelength, references, previous_kappa):
+    def _guarded_coefficients(self, geometry, wavelength, references, previous_kappa, *, diagnostic=False):
         """Same raw FDE and complex extraction, with validated isolated tracking.
 
         Raw packets are already transferred by the cached native path. Reusing
         them for Python selection adds no FDE solve or extra field retrieval.
         """
-        from .tracking import select_isolated, require_candidate, CandidateRejected
+        from .tracking import select_isolated, require_candidate, CandidateRejected, require_anchor_match
         from .modes import select_supermode_pair, extract_coupling, field_overlap
         raw = self._raw_packets([self._raw_request(geometry,wavelength,u,l) for u,l in ((1,0),(0,1),(1,1))])
         candidates = [[snapshot_from_native(v) for v in packet['items'][:int(scalar(packet['n']))]] for packet in raw]
         upper, u_overlap = select_isolated(candidates[0],references,'upper',self.config)
         lower, l_overlap = select_isolated(candidates[1],references,'lower',self.config)
+        anchor = getattr(self,'_endpoint_full_modes',{}).get((float(wavelength),geometry.w1_m,geometry.d_c2c_m,geometry.liquid_index))
+        if anchor is not None:
+            u_overlap=min(u_overlap,require_anchor_match(upper,anchor[0],self.config))
+            l_overlap=min(l_overlap,require_anchor_match(lower,anchor[1],self.config))
         eligible = [m for m in candidates[2] if m.te_fraction >= self.config.solver.minimum_te_fraction]
         if len(eligible)<2:
             raise CandidateRejected('Fewer than two TE-eligible coupled modes.')
@@ -353,40 +357,77 @@ class NativeLumapiBackend(LumapiBackend):
             previous_kappa=previous_kappa,kappa_profile_check=float(check),overlap_upper_lower=ul,
             min_mode_overlap=min(u_overlap,l_overlap,pair_overlap),
             identities=tuple(m.identity for m in (upper,lower,plus,minus)))
-        require_candidate(coefficient,self.config)
-        return coefficient, ModeReference(upper,lower,(plus,minus),valid=True)
+        valid = True
+        try:
+            require_candidate(coefficient,self.config)
+        except CandidateRejected:
+            if not diagnostic:
+                raise
+            valid = False
+        return coefficient, ModeReference(upper,lower,(plus,minus),valid=valid)
 
     def require_endpoint_consistency(self, endpoint, *, progress=None):
-        from .tracking import endpoint_consistency, EndpointConsistencyError
+        from .tracking import endpoint_consistency, EndpointConsistencyError, enforce_endpoint_report, require_anchor_match
         from .geometry import make_geometry
         from types import SimpleNamespace
         from .block_io import write_json
         wavelengths = np.asarray(endpoint.wavelengths_m)
         grid = []
+        anchor_checks = []
+        coefficient_checks = []
+        self._endpoint_full_modes = {}
         for wavelength in wavelengths:
             row = []
-            for width,offset in ((endpoint.w1_input_m,self.config.geometry.d_c2c_input_m),
-                                 (endpoint.w1_output_m,self.config.geometry.d_c2c_output_m)):
+            for end,width,offset in (('input',endpoint.w1_input_m,self.config.geometry.d_c2c_input_m),
+                                    ('output',endpoint.w1_output_m,self.config.geometry.d_c2c_output_m)):
                 geometry = make_geometry(self.config.geometry,w1_m=width,h_rib_m=endpoint.h_rib_m,
                     h_gap_m=endpoint.h_gap_m,d_c2c_m=offset,state='cross',
                     liquid_index=float(self.bank.liquid_cross.index(wavelength)))
                 modes = [self.solve_isolated_mode(geometry,float(wavelength),guide=guide,compact_x=False)[0]
                          for guide in ('upper','lower')]
+                compact = [self.solve_isolated_mode(geometry,float(wavelength),guide=guide,compact_x=True)[0]
+                           for guide in ('upper','lower')]
+                record = next(r for r in endpoint.endpoint_records if r['state']=='cross' and r['end']==end
+                              and abs(r['wavelength_m']-wavelength)<1e-15)
+                for guide,full_mode,compact_mode in zip(('upper','lower'),modes,compact):
+                    overlap = require_anchor_match(full_mode,compact_mode,self.config)
+                    expected = complex(record[f'beta_{guide}_real_rad_per_m'],record[f'beta_{guide}_imag_rad_per_m'])*wavelength/(2*np.pi)
+                    anchor_error = abs(compact_mode.neff-expected)
+                    if anchor_error>self.config.solver.domain_convergence_neff_tolerance:
+                        raise EndpointConsistencyError('Fresh compact endpoint mode disagrees with the Block 1 handoff.')
+                    anchor_checks.append({'wavelength_m':float(wavelength),'end':end,'guide':guide,
+                        'aligned_field_overlap':overlap,'compact_neff_error':float(anchor_error),
+                        'full_neff':full_mode.neff,'compact_neff':compact_mode.neff})
+                self._endpoint_full_modes[float(wavelength),width,offset,geometry.liquid_index] = modes
+                coefficient,reference = self._guarded_coefficients(geometry,float(wavelength),(),None,diagnostic=True)
+                coefficient_checks.append({'wavelength_m':float(wavelength),'end':end,
+                    'passed':bool(reference.valid),'coefficients':asdict(coefficient)})
                 upper, lower = (2*np.pi*m.neff/wavelength for m in modes)
                 row.append(SimpleNamespace(beta_upper=upper,beta_lower=lower,delta_beta=upper-lower))
             grid.append(row)
         report = endpoint_consistency(grid,wavelengths,endpoint,self.config)
+        report.update(field_identity_passed=True,anchor_checks=anchor_checks,
+                      coefficient_extraction_passed=all(c['passed'] for c in coefficient_checks),
+                      coefficient_checks=coefficient_checks,
+                      policy=self.config.solver.endpoint_domain_policy,
+                      exploratory_warning=not report['passed'] and self.config.solver.endpoint_domain_policy=='warn_exploratory')
         if progress:
             write_json(progress.output_dir/'endpoint_tracking_preflight.json',report)
             progress.checkpoint('endpoint_tracking_preflight',report)
-        if not report['passed']:
-            raise EndpointConsistencyError('Fixed-endpoint full/compact mode consistency failed at unchanged tolerance: '+str(report))
+            if report['exploratory_warning']:
+                progress.note('Exploratory pilot warning: endpoint domain-index tolerance exceeded; field identities and detuning signs remain mandatory.',force=True)
+        if not report['coefficient_extraction_passed']:
+            failed=[(c['wavelength_m'],c['end'],c['coefficients']['extraction_flag'])
+                    for c in coefficient_checks if not c['passed']]
+            raise EndpointConsistencyError('Fixed-endpoint coefficient extraction failed: '+str(failed))
+        enforce_endpoint_report(report,self.config)
         return report
 
     def evaluate_profile_grid(self, config, bank, endpoint, w_control, d_control, z, wavelengths, *, state, progress=None):
         request = profile_request(endpoint, w_control, d_control, z, wavelengths, state)
         key = stable_key({"native_grid": self.script_hash, "provenance": optical_identity(self.config), "config": self.native_config(),
                           "tracking_method":config.solver.tracking_method,"recovery_depth":config.solver.tracking_recovery_depth,
+                          "endpoint_domain_policy":config.solver.endpoint_domain_policy,
                           "request": request})
         if self.cache:
             cached = self.cache.get(key, kind="native_profile_grid")

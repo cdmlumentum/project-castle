@@ -80,13 +80,15 @@ def export_endpoint(output,config,endpoint,*,backend_name,source=None,backend=No
 def profile_report(solution,endpoint,config):
     quality = validate_solution(solution,endpoint,config)
     optimization = bool(solution.optimizer_history and solution.optimizer_history[-1]['success'])
-    passed = optimization and solution.grid_converged and quality['passed']
+    passed = optimization and solution.grid_converged and quality['passed'] and config.solver.endpoint_domain_policy=='strict'
     constraints = validate_endpoint(endpoint,config)
     edges_only = len(solution.wavelengths_m)==2
     return {'block':2,'status':'passed' if passed else 'review','execution_completed':True,'usable':True,
             'optimization_converged':optimization,'grid_converged':bool(solution.grid_converged),
             'coefficient_quality':quality,'objective_achieved':solution.objective,
             'target_fit_acceptance_threshold':None,
+            'exploratory_only':config.solver.endpoint_domain_policy=='warn_exploratory',
+            'endpoint_domain_policy':config.solver.endpoint_domain_policy,
             'scope':('cross-state profile optimization and z coefficient interpolation checks at the band edges'
                      if edges_only else 'cross-state profile optimization on the saved wavelength grid'),
             'wavelength_validation':('band edges only; interior wavelengths not checked in Block 2'

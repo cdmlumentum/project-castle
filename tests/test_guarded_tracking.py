@@ -10,7 +10,8 @@ from vlac.config import load_config
 from vlac.geometry import ClampedCubicProfile
 from vlac.modes import ModeSnapshot, ModeReference, field_overlap, extract_coupling
 from vlac.monotone import controls, linear_coordinates
-from vlac.tracking import CandidateRejected, select_isolated, require_candidate, endpoint_consistency
+from vlac.tracking import (CandidateRejected, EndpointConsistencyError, select_isolated, require_candidate,
+                           endpoint_consistency, enforce_endpoint_report, require_anchor_match)
 from vlac.profiles import _profile_coefficients
 from vlac.materials import build_material_bank
 from vlac.native_backend import NativeLumapiBackend
@@ -61,6 +62,64 @@ class GuardedTrackingTests(unittest.TestCase):
         with self.assertRaises(CandidateRejected):
             select_isolated([replace(m,ex=m.ex*0,ey=m.ey*0)],(),'upper',self.config)
 
+    def test_domain_warning_does_not_relax_sign_or_field_identity(self):
+        cfg=self.config
+        cfg.solver.endpoint_domain_policy='warn_exploratory'
+        enforce_endpoint_report({'passed':False,'detuning_signs_passed':True},cfg)
+        with self.assertRaises(EndpointConsistencyError):
+            enforce_endpoint_report({'passed':False,'detuning_signs_passed':False},cfg)
+        with self.assertRaises(EndpointConsistencyError):
+            require_anchor_match(mode(0,odd=True),mode(),cfg)
+        cfg.solver.endpoint_domain_policy='strict'
+        with self.assertRaises(EndpointConsistencyError):
+            enforce_endpoint_report({'passed':False,'detuning_signs_passed':True},cfg)
+
+    def test_domain_warning_is_only_permitted_with_explicit_short_budgets(self):
+        cfg=self.config
+        cfg.solver.endpoint_domain_policy='warn_exploratory'
+        with self.assertRaisesRegex(ValueError,'warn_exploratory requires'):
+            cfg.validate()
+        cfg.optimizer.max_function_evaluations_per_grid=6
+        cfg.optimizer.max_grid_refinements=0
+        cfg.execution.max_solves=120
+        cfg.execution.max_seconds=2700
+        cfg.validate()
+        cfg.optimizer.max_function_evaluations_per_grid=7
+        with self.assertRaises(ValueError): cfg.validate()
+
+    def test_fixed_endpoint_coupling_preflight_cannot_be_bypassed_by_warning(self):
+        cfg=self.config
+        cfg.geometry.d_c2c_input_m=cfg.geometry.d_c2c_output_m=0.
+        cfg.solver.endpoint_domain_policy='warn_exploratory'
+        cfg.optimizer.max_function_evaluations_per_grid=6
+        cfg.optimizer.max_grid_refinements=0
+        cfg.execution.max_solves=120
+        cfg.execution.max_seconds=2700
+        scale=2*np.pi/1.26e-6
+        records=[{'state':'cross','end':end,'wavelength_m':1.26e-6,
+            'beta_upper_real_rad_per_m':scale*1.75,'beta_upper_imag_rad_per_m':0.,
+            'beta_lower_real_rad_per_m':scale*1.74,'beta_lower_imag_rad_per_m':0.,
+            'delta_beta_real_rad_per_m':scale*.01} for end in ('input','output')]
+        endpoint=SimpleNamespace(wavelengths_m=[1.26e-6],w1_input_m=1.1e-6,w1_output_m=1.8e-6,
+            h_rib_m=175e-9,h_gap_m=1e-6,endpoint_records=records)
+        def isolated(g,wavelength,*,guide,compact_x):
+            center=g.d_c2c_m if guide=='upper' and not compact_x else 0.
+            return replace(mode(center),neff=1.75 if guide=='upper' else 1.74),1.
+        bad=extract_coupling(scale*1.75,scale*1.74,scale*1.7451,scale*1.7449)
+        m=mode()
+        with tempfile.TemporaryDirectory() as folder,NativeLumapiBackend(cfg) as backend:
+            backend.solve_isolated_mode=Mock(side_effect=isolated)
+            backend._guarded_coefficients=Mock(return_value=(bad,ModeReference(m,m,(m,m),valid=False)))
+            progress=SimpleNamespace(output_dir=Path(folder),checkpoint=Mock(),note=Mock())
+            with self.assertRaisesRegex(EndpointConsistencyError,'Fixed-endpoint coefficient extraction'):
+                backend.require_endpoint_consistency(endpoint,progress=progress)
+            report=json.loads((Path(folder)/'endpoint_tracking_preflight.json').read_text())
+            self.assertTrue(report['field_identity_passed'])
+            self.assertFalse(report['coefficient_extraction_passed'])
+            self.assertEqual(len(report['coefficient_checks']),2)
+            self.assertEqual({c['end'] for c in report['anchor_checks']},{'input','output'})
+            self.assertEqual(backend.budget.solves,0)
+
     def test_low_overlap_is_not_cured_by_high_neff(self):
         m=mode()
         ref=ModeReference(m,m,(m,m))
@@ -90,6 +149,25 @@ class GuardedTrackingTests(unittest.TestCase):
         self.assertAlmostEqual(actual.kappa.real,expected.kappa.real)
         self.assertLess(actual.kappa.real,0)
         self.assertTrue(reference.valid)
+        backend.close()
+
+    def test_diagnostic_flagged_coefficients_cannot_be_used_as_references(self):
+        cfg=self.config
+        backend=NativeLumapiBackend(cfg)
+        a=mode(-2e-6)
+        b=replace(mode(2e-6),neff=1.74)
+        pair=[replace(a,neff=1.7451),replace(b,neff=1.7449)]
+        packets=[{'n':len(modes),'items':[asdict(m) for m in modes]} for modes in ([a],[b],pair)]
+        backend._raw_packets=Mock(return_value=packets)
+        geometry=make_geometry(cfg.geometry,w1_m=1.5e-6,h_rib_m=175e-9,h_gap_m=1e-6,
+                               d_c2c_m=0.,state='cross',liquid_index=1.55)
+        with self.assertRaises(CandidateRejected):
+            backend.evaluate_coefficients(geometry,1.26e-6)
+        coefficient,reference=backend._guarded_coefficients(geometry,1.26e-6,(),None,diagnostic=True)
+        self.assertFalse(reference.valid)
+        self.assertNotEqual(coefficient.kappa.imag,0.)
+        with self.assertRaisesRegex(CandidateRejected,'rejected mode reference'):
+            backend.evaluate_coefficients(geometry,1.26e-6,references=(reference,))
         backend.close()
 
     def test_named_method_is_handoff_distinct_and_standalone_does_not_substitute(self):

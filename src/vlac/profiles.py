@@ -81,11 +81,11 @@ def _profile_coefficients(
                         if not ref.valid:
                             raise CandidateRejected('Backend returned a rejected reference.')
                     return value,ref
-                except CandidateRejected:
+                except CandidateRejected as exc:
                     # The rejected reference is never advanced. Bridge only from
                     # the last accepted point; recovery does not relax tolerances.
                     if not guarded or last_reference is None or depth<=0 or last_position==position:
-                        raise
+                        raise type(exc)(f'z={position*1e6:.6g} um, wavelength={wavelength*1e9:.6g} nm: {exc}') from exc
                     midpoint = (last_position+position)/2
                     middle, middle_ref = sample_at(midpoint,last_position,last_reference,last_kappa,depth-1)
                     if progress:
@@ -108,10 +108,9 @@ def _profile_coefficients(
         all_coeffs.append(row)
         previous_lambda_references = current_lambda_references
     if guarded:
-        from .tracking import endpoint_consistency, EndpointConsistencyError
+        from .tracking import endpoint_consistency, enforce_endpoint_report
         check = endpoint_consistency(all_coeffs,wavelengths_m,endpoint,config,state=state)
-        if not check['passed']:
-            raise EndpointConsistencyError('Recalculated profile endpoints disagree with Block 1: '+str(check))
+        enforce_endpoint_report(check,config)
     if progress:
         progress.finish_stage()
     return all_coeffs

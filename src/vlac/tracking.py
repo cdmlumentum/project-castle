@@ -71,6 +71,8 @@ def endpoint_consistency(grid, wavelengths, endpoint, config, *, state='cross'):
     The existing domain neff tolerance is unchanged. Check each guide as well
     as detuning sign, so common-mode beta errors cannot conceal a branch swap.
     """
+    if len(grid)!=len(wavelengths) or not len(grid) or any(len(row)<2 for row in grid):
+        raise EndpointConsistencyError('Missing endpoint coefficient samples.')
     checks = []
     for wavelength, row in zip(wavelengths,grid):
         for end, coefficient in (('input',row[0]),('output',row[-1])):
@@ -88,4 +90,21 @@ def endpoint_consistency(grid, wavelengths, endpoint, config, *, state='cross'):
                            'same_detuning_sign':bool(same_sign),
                            'passed':bool(same_sign and max(errors.values())<=config.solver.domain_convergence_neff_tolerance)})
     return {'passed':all(c['passed'] for c in checks),'checks':checks,
+            'detuning_signs_passed':all(c['same_detuning_sign'] for c in checks),
             'neff_tolerance':config.solver.domain_convergence_neff_tolerance}
+
+
+def enforce_endpoint_report(report, config):
+    """Only the absolute domain-index comparison may be a pilot warning."""
+    if report['passed']:
+        return
+    if (not report.get('detuning_signs_passed',False)
+            or config.solver.endpoint_domain_policy != 'warn_exploratory'):
+        raise EndpointConsistencyError('Endpoint consistency failed at unchanged tolerance: '+str(report))
+
+
+def require_anchor_match(mode, anchor, config):
+    overlap = field_overlap(mode,translated_reference(anchor,mode))
+    if not np.isfinite(overlap) or overlap<config.solver.minimum_mode_overlap:
+        raise EndpointConsistencyError(f'Independent endpoint field identity failed: overlap={overlap:.6g}')
+    return overlap

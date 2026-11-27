@@ -71,6 +71,8 @@ def physics_signature(config, block):
         if config.solver.tracking_method != 'legacy' or config.optimizer.method != 'bounded_powell':
             signature['profile_methods'] = {'tracking':config.solver.tracking_method,
                 'recovery_depth':config.solver.tracking_recovery_depth,'optimizer':config.optimizer.method}
+            if config.solver.endpoint_domain_policy != 'strict':
+                signature['profile_methods']['endpoint_domain_policy'] = config.solver.endpoint_domain_policy
     if block>=4: signature['propagation'] = raw['propagation']
     return clean(signature)
 

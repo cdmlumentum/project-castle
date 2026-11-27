@@ -22,10 +22,11 @@ def main():
     before=cfg.as_dict()
     cfg.solver.tracking_method='guarded_translation_v1'
     cfg.solver.tracking_recovery_depth=3
+    cfg.solver.endpoint_domain_policy='warn_exploratory'
     cfg.optimizer.method='monotone_powell'
     cfg.optimizer.max_function_evaluations_per_grid=6
     cfg.optimizer.max_grid_refinements=0
-    cfg.optimizer.complete_within_seconds=None
+    cfg.optimizer.complete_within_seconds=2700
     cfg.execution.max_solves=120
     cfg.execution.max_seconds=2700
     cfg.execution.native_batch_size=1
@@ -41,8 +42,9 @@ def main():
         'max_seconds':2700,'max_fresh_fde_solves':120,'max_objective_evaluations':6,
         'midpoint_validation':'unchanged independent z midpoints and 0.01 tolerance',
         'optical_settings_preserved':all(before[k]==cfg.as_dict()[k] for k in ('geometry','materials','device','convergence')),
-        'solver_changes':{'tracking_method':cfg.solver.tracking_method,'tracking_recovery_depth':3},
-        'longer_run_gate':'Requires passed endpoint consistency, candidate validity and independent midpoint validation; never auto-launches a longer run.'})
+        'solver_changes':{'tracking_method':cfg.solver.tracking_method,'tracking_recovery_depth':3,
+                          'endpoint_domain_policy':'warn_exploratory'},
+        'longer_run_gate':'Requires independent coefficient mesh/domain checks, mandatory mode identity and candidate validity, and independent midpoint validation; never auto-launches a longer run.'})
     print(out/'pilot_config.json')
 
 if __name__=='__main__': main()

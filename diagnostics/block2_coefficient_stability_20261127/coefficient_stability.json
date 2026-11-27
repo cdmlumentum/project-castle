@@ -1,0 +1,2017 @@
+{
+  "acceptance": {
+    "candidate_margin_factors": [
+      1.0,
+      0.75,
+      0.5
+    ],
+    "candidate_mesh_factors": [
+      1.0,
+      1.25,
+      1.5
+    ],
+    "coefficient_atol_rad_per_m": 2.0,
+    "coefficient_rtol": 0.01,
+    "comparison_dx_m": 6e-08,
+    "comparison_dy_m": 3e-08,
+    "local_mesh_padding_m": 4e-07,
+    "loss_error_db": 0.01,
+    "max_seconds": 21600,
+    "max_solves": 1200,
+    "minimum_power_overlap": 0.999,
+    "neff_atol": 2e-05,
+    "phase_error_rad": 0.02,
+    "pml_layers": 12,
+    "pml_test_extra_layers": 4,
+    "polarization_atol": 0.01,
+    "reference_domain_factors": [
+      1.0,
+      1.25,
+      1.5,
+      1.75
+    ],
+    "reference_mesh_factors": [
+      1.0,
+      0.75,
+      0.5,
+      0.375
+    ],
+    "reference_sentinels": 4,
+    "timing_repeats": 2
+  },
+  "all_extractions_valid": false,
+  "coefficient_checks_passed": false,
+  "comparison_helper_sha256": "f3991d4a55fd2f09b13700dafd72c16f94f4e5db1cdbeec4ca609cc10054b178",
+  "comparisons": [
+    {
+      "against_previous_setting": {
+        "actual_extraction_flag": "negative_kappa_squared",
+        "delta_beta_error_rad_per_m": 42.104285687208176,
+        "kappa_error_rad_per_m": 9.148304686978804,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 1.5063719268926357e-10,
+        "maximum_real_neff_error": 7.261212486642105e-05,
+        "passed": false,
+        "raw_complex_kappa_difference_rad_per_m": 9.148304686978804,
+        "reference_extraction_flag": "negative_kappa_squared",
+        "scope": "stored_scalar_coefficients"
+      },
+      "against_production_baseline": {
+        "actual_extraction_flag": "negative_kappa_squared",
+        "delta_beta_error_rad_per_m": 42.104285687208176,
+        "kappa_error_rad_per_m": 9.148304686978804,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 1.5063719268926357e-10,
+        "maximum_real_neff_error": 7.261212486642105e-05,
+        "passed": false,
+        "raw_complex_kappa_difference_rad_per_m": 9.148304686978804,
+        "reference_extraction_flag": "negative_kappa_squared",
+        "scope": "stored_scalar_coefficients"
+      },
+      "axis": "mesh",
+      "setting": "mesh_1p25",
+      "wavelength_m": 1.26e-06,
+      "z_m": 0.0015
+    },
+    {
+      "against_previous_setting": {
+        "actual_extraction_flag": "ok",
+        "delta_beta_error_rad_per_m": 261.6573554147035,
+        "kappa_error_rad_per_m": 10.991072881918626,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 2.3188198288710297e-10,
+        "maximum_real_neff_error": 0.0001250836423697808,
+        "passed": false,
+        "raw_complex_kappa_difference_rad_per_m": 10.991072881918626,
+        "reference_extraction_flag": "ok",
+        "scope": "stored_scalar_coefficients"
+      },
+      "against_production_baseline": {
+        "actual_extraction_flag": "ok",
+        "delta_beta_error_rad_per_m": 261.6573554147035,
+        "kappa_error_rad_per_m": 10.991072881918626,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 2.3188198288710297e-10,
+        "maximum_real_neff_error": 0.0001250836423697808,
+        "passed": false,
+        "raw_complex_kappa_difference_rad_per_m": 10.991072881918626,
+        "reference_extraction_flag": "ok",
+        "scope": "stored_scalar_coefficients"
+      },
+      "axis": "mesh",
+      "setting": "mesh_1p25",
+      "wavelength_m": 1.26e-06,
+      "z_m": 0.00075
+    },
+    {
+      "against_previous_setting": {
+        "actual_extraction_flag": "negative_kappa_squared",
+        "delta_beta_error_rad_per_m": 429.71536547131836,
+        "kappa_error_rad_per_m": 20.080941488322424,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 2.466993343028307e-09,
+        "maximum_real_neff_error": 0.0001226821971081952,
+        "passed": false,
+        "raw_complex_kappa_difference_rad_per_m": 20.080941488322424,
+        "reference_extraction_flag": "negative_kappa_squared",
+        "scope": "stored_scalar_coefficients"
+      },
+      "against_production_baseline": {
+        "actual_extraction_flag": "negative_kappa_squared",
+        "delta_beta_error_rad_per_m": 429.71536547131836,
+        "kappa_error_rad_per_m": 20.080941488322424,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 2.466993343028307e-09,
+        "maximum_real_neff_error": 0.0001226821971081952,
+        "passed": false,
+        "raw_complex_kappa_difference_rad_per_m": 20.080941488322424,
+        "reference_extraction_flag": "negative_kappa_squared",
+        "scope": "stored_scalar_coefficients"
+      },
+      "axis": "mesh",
+      "setting": "mesh_1p25",
+      "wavelength_m": 1.34e-06,
+      "z_m": 0.0015
+    },
+    {
+      "against_previous_setting": {
+        "actual_extraction_flag": "ok",
+        "delta_beta_error_rad_per_m": 135.8243962097913,
+        "kappa_error_rad_per_m": 13.31018670120011,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 3.850628547375292e-09,
+        "maximum_real_neff_error": 0.0001226821971081952,
+        "passed": false,
+        "raw_complex_kappa_difference_rad_per_m": 13.31018670120011,
+        "reference_extraction_flag": "ok",
+        "scope": "stored_scalar_coefficients"
+      },
+      "against_production_baseline": {
+        "actual_extraction_flag": "ok",
+        "delta_beta_error_rad_per_m": 135.8243962097913,
+        "kappa_error_rad_per_m": 13.31018670120011,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 3.850628547375292e-09,
+        "maximum_real_neff_error": 0.0001226821971081952,
+        "passed": false,
+        "raw_complex_kappa_difference_rad_per_m": 13.31018670120011,
+        "reference_extraction_flag": "ok",
+        "scope": "stored_scalar_coefficients"
+      },
+      "axis": "mesh",
+      "setting": "mesh_1p25",
+      "wavelength_m": 1.34e-06,
+      "z_m": 0.00075
+    },
+    {
+      "against_previous_setting": {
+        "actual_extraction_flag": "negative_kappa_squared",
+        "delta_beta_error_rad_per_m": 12.49735676497221,
+        "kappa_error_rad_per_m": 7.823254541456777,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 1.6575396959614724e-10,
+        "maximum_real_neff_error": 0.0009445924040712742,
+        "passed": false,
+        "raw_complex_kappa_difference_rad_per_m": 7.823254541456777,
+        "reference_extraction_flag": "negative_kappa_squared",
+        "scope": "stored_scalar_coefficients"
+      },
+      "against_production_baseline": {
+        "actual_extraction_flag": "negative_kappa_squared",
+        "delta_beta_error_rad_per_m": 54.601642452180386,
+        "kappa_error_rad_per_m": 16.97155922843558,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 3.13870155893984e-10,
+        "maximum_real_neff_error": 0.0010172045289376954,
+        "passed": false,
+        "raw_complex_kappa_difference_rad_per_m": 16.97155922843558,
+        "reference_extraction_flag": "negative_kappa_squared",
+        "scope": "stored_scalar_coefficients"
+      },
+      "axis": "mesh",
+      "setting": "mesh_1p5",
+      "wavelength_m": 1.26e-06,
+      "z_m": 0.0015
+    },
+    {
+      "against_previous_setting": {
+        "actual_extraction_flag": "ok",
+        "delta_beta_error_rad_per_m": 517.5806322805583,
+        "kappa_error_rad_per_m": 29.74293415837201,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 2.4403341557339364e-10,
+        "maximum_real_neff_error": 0.0009445924040712742,
+        "passed": false,
+        "raw_complex_kappa_difference_rad_per_m": 29.74293415837201,
+        "reference_extraction_flag": "ok",
+        "scope": "stored_scalar_coefficients"
+      },
+      "against_production_baseline": {
+        "actual_extraction_flag": "ok",
+        "delta_beta_error_rad_per_m": 255.92327686585486,
+        "kappa_error_rad_per_m": 40.734007040290635,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 4.759153984604966e-10,
+        "maximum_real_neff_error": 0.0010172045289376954,
+        "passed": false,
+        "raw_complex_kappa_difference_rad_per_m": 40.734007040290635,
+        "reference_extraction_flag": "ok",
+        "scope": "stored_scalar_coefficients"
+      },
+      "axis": "mesh",
+      "setting": "mesh_1p5",
+      "wavelength_m": 1.26e-06,
+      "z_m": 0.00075
+    },
+    {
+      "against_previous_setting": {
+        "actual_extraction_flag": "negative_kappa_squared",
+        "delta_beta_error_rad_per_m": 135.40683317463845,
+        "kappa_error_rad_per_m": 8.786133361173142,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 1.1316870738116855e-09,
+        "maximum_real_neff_error": 0.00090227757271394,
+        "passed": false,
+        "raw_complex_kappa_difference_rad_per_m": 8.786133361173142,
+        "reference_extraction_flag": "negative_kappa_squared",
+        "scope": "stored_scalar_coefficients"
+      },
+      "against_production_baseline": {
+        "actual_extraction_flag": "negative_kappa_squared",
+        "delta_beta_error_rad_per_m": 294.3085322966799,
+        "kappa_error_rad_per_m": 28.867074849495566,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 3.5986804168399927e-09,
+        "maximum_real_neff_error": 0.0009960818762723962,
+        "passed": false,
+        "raw_complex_kappa_difference_rad_per_m": 28.867074849495566,
+        "reference_extraction_flag": "negative_kappa_squared",
+        "scope": "stored_scalar_coefficients"
+      },
+      "axis": "mesh",
+      "setting": "mesh_1p5",
+      "wavelength_m": 1.34e-06,
+      "z_m": 0.0015
+    },
+    {
+      "against_previous_setting": {
+        "actual_extraction_flag": "ok",
+        "delta_beta_error_rad_per_m": 364.8689936781302,
+        "kappa_error_rad_per_m": 39.11533534549835,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 1.5864622900612972e-09,
+        "maximum_real_neff_error": 0.0008733996791642011,
+        "passed": false,
+        "raw_complex_kappa_difference_rad_per_m": 39.11533534549835,
+        "reference_extraction_flag": "ok",
+        "scope": "stored_scalar_coefficients"
+      },
+      "against_production_baseline": {
+        "actual_extraction_flag": "ok",
+        "delta_beta_error_rad_per_m": 500.6933898879215,
+        "kappa_error_rad_per_m": 52.42552204669846,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 5.437090837436589e-09,
+        "maximum_real_neff_error": 0.0009960818762723962,
+        "passed": false,
+        "raw_complex_kappa_difference_rad_per_m": 52.42552204669846,
+        "reference_extraction_flag": "ok",
+        "scope": "stored_scalar_coefficients"
+      },
+      "axis": "mesh",
+      "setting": "mesh_1p5",
+      "wavelength_m": 1.34e-06,
+      "z_m": 0.00075
+    },
+    {
+      "against_previous_setting": {
+        "actual_extraction_flag": "negative_kappa_squared",
+        "delta_beta_error_rad_per_m": 1.0430815606414617e-07,
+        "kappa_error_rad_per_m": 5.083613379349885e-08,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 9.651134056373381e-13,
+        "maximum_real_neff_error": 2.3532136124809558e-14,
+        "passed": false,
+        "raw_complex_kappa_difference_rad_per_m": 5.083613379349885e-08,
+        "reference_extraction_flag": "negative_kappa_squared",
+        "scope": "stored_scalar_coefficients"
+      },
+      "against_production_baseline": {
+        "actual_extraction_flag": "negative_kappa_squared",
+        "delta_beta_error_rad_per_m": 1.0430815606414617e-07,
+        "kappa_error_rad_per_m": 5.083613379349885e-08,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 9.651134056373381e-13,
+        "maximum_real_neff_error": 2.3532136124809558e-14,
+        "passed": false,
+        "raw_complex_kappa_difference_rad_per_m": 5.083613379349885e-08,
+        "reference_extraction_flag": "negative_kappa_squared",
+        "scope": "stored_scalar_coefficients"
+      },
+      "axis": "x_domain",
+      "setting": "x_domain_1p25",
+      "wavelength_m": 1.26e-06,
+      "z_m": 0.0015
+    },
+    {
+      "against_previous_setting": {
+        "actual_extraction_flag": "ok",
+        "delta_beta_error_rad_per_m": 3.730316525151555e-09,
+        "kappa_error_rad_per_m": 8.526591731408098e-10,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 2.496697797706108e-12,
+        "maximum_real_neff_error": 1.1205779107052171e-15,
+        "passed": true,
+        "raw_complex_kappa_difference_rad_per_m": 8.526591731408098e-10,
+        "reference_extraction_flag": "ok",
+        "scope": "stored_scalar_coefficients"
+      },
+      "against_production_baseline": {
+        "actual_extraction_flag": "ok",
+        "delta_beta_error_rad_per_m": 3.730316525151555e-09,
+        "kappa_error_rad_per_m": 8.526591731408098e-10,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 2.496697797706108e-12,
+        "maximum_real_neff_error": 1.1205779107052171e-15,
+        "passed": true,
+        "raw_complex_kappa_difference_rad_per_m": 8.526591731408098e-10,
+        "reference_extraction_flag": "ok",
+        "scope": "stored_scalar_coefficients"
+      },
+      "axis": "x_domain",
+      "setting": "x_domain_1p25",
+      "wavelength_m": 1.26e-06,
+      "z_m": 0.00075
+    },
+    {
+      "against_previous_setting": {
+        "actual_extraction_flag": "negative_kappa_squared",
+        "delta_beta_error_rad_per_m": 1.1660158637640565e-06,
+        "kappa_error_rad_per_m": 1.2222166653639208e-07,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 1.845536017588534e-12,
+        "maximum_real_neff_error": 2.5185136767691114e-13,
+        "passed": false,
+        "raw_complex_kappa_difference_rad_per_m": 1.2222166653639208e-07,
+        "reference_extraction_flag": "negative_kappa_squared",
+        "scope": "stored_scalar_coefficients"
+      },
+      "against_production_baseline": {
+        "actual_extraction_flag": "negative_kappa_squared",
+        "delta_beta_error_rad_per_m": 1.1660158637640565e-06,
+        "kappa_error_rad_per_m": 1.2222166653639208e-07,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 1.845536017588534e-12,
+        "maximum_real_neff_error": 2.5185136767691114e-13,
+        "passed": false,
+        "raw_complex_kappa_difference_rad_per_m": 1.2222166653639208e-07,
+        "reference_extraction_flag": "negative_kappa_squared",
+        "scope": "stored_scalar_coefficients"
+      },
+      "axis": "x_domain",
+      "setting": "x_domain_1p25",
+      "wavelength_m": 1.34e-06,
+      "z_m": 0.0015
+    },
+    {
+      "against_previous_setting": {
+        "actual_extraction_flag": "ok",
+        "delta_beta_error_rad_per_m": 1.0244642391396395e-08,
+        "kappa_error_rad_per_m": 8.849592323658434e-10,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 1.269303068438043e-12,
+        "maximum_real_neff_error": 2.1848304766924466e-15,
+        "passed": true,
+        "raw_complex_kappa_difference_rad_per_m": 8.849592323658434e-10,
+        "reference_extraction_flag": "ok",
+        "scope": "stored_scalar_coefficients"
+      },
+      "against_production_baseline": {
+        "actual_extraction_flag": "ok",
+        "delta_beta_error_rad_per_m": 1.0244642391396395e-08,
+        "kappa_error_rad_per_m": 8.849592323658434e-10,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 1.269303068438043e-12,
+        "maximum_real_neff_error": 2.1848304766924466e-15,
+        "passed": true,
+        "raw_complex_kappa_difference_rad_per_m": 8.849592323658434e-10,
+        "reference_extraction_flag": "ok",
+        "scope": "stored_scalar_coefficients"
+      },
+      "axis": "x_domain",
+      "setting": "x_domain_1p25",
+      "wavelength_m": 1.34e-06,
+      "z_m": 0.00075
+    },
+    {
+      "against_previous_setting": {
+        "actual_extraction_flag": "negative_kappa_squared",
+        "delta_beta_error_rad_per_m": 9.313305625319979e-09,
+        "kappa_error_rad_per_m": 2.328993861380563e-07,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 1.3158099924314196e-12,
+        "maximum_real_neff_error": 2.6146817916455065e-15,
+        "passed": false,
+        "raw_complex_kappa_difference_rad_per_m": 2.328993861380563e-07,
+        "reference_extraction_flag": "negative_kappa_squared",
+        "scope": "stored_scalar_coefficients"
+      },
+      "against_production_baseline": {
+        "actual_extraction_flag": "negative_kappa_squared",
+        "delta_beta_error_rad_per_m": 1.1362141189702278e-07,
+        "kappa_error_rad_per_m": 1.8208220332946977e-07,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 1.1856881055614453e-12,
+        "maximum_real_neff_error": 2.4652714035514775e-14,
+        "passed": false,
+        "raw_complex_kappa_difference_rad_per_m": 1.8208220332946977e-07,
+        "reference_extraction_flag": "negative_kappa_squared",
+        "scope": "stored_scalar_coefficients"
+      },
+      "axis": "x_domain",
+      "setting": "x_domain_1p5",
+      "wavelength_m": 1.26e-06,
+      "z_m": 0.0015
+    },
+    {
+      "against_previous_setting": {
+        "actual_extraction_flag": "ok",
+        "delta_beta_error_rad_per_m": 3.7256675960098285e-09,
+        "kappa_error_rad_per_m": 6.646343882114389e-10,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 1.899348466491104e-12,
+        "maximum_real_neff_error": 1.4941038809402893e-15,
+        "passed": true,
+        "raw_complex_kappa_difference_rad_per_m": 6.646343882114389e-10,
+        "reference_extraction_flag": "ok",
+        "scope": "stored_scalar_coefficients"
+      },
+      "against_production_baseline": {
+        "actual_extraction_flag": "ok",
+        "delta_beta_error_rad_per_m": 1.4055989727438006e-10,
+        "kappa_error_rad_per_m": 1.499062531356886e-09,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 1.824953092111921e-12,
+        "maximum_real_neff_error": 3.7352597023507233e-16,
+        "passed": true,
+        "raw_complex_kappa_difference_rad_per_m": 1.499062531356886e-09,
+        "reference_extraction_flag": "ok",
+        "scope": "stored_scalar_coefficients"
+      },
+      "axis": "x_domain",
+      "setting": "x_domain_1p5",
+      "wavelength_m": 1.26e-06,
+      "z_m": 0.00075
+    },
+    {
+      "against_previous_setting": {
+        "actual_extraction_flag": "negative_kappa_squared",
+        "delta_beta_error_rad_per_m": 4.657449145139408e-09,
+        "kappa_error_rad_per_m": 2.5981635721769126e-08,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 1.2059869340871871e-12,
+        "maximum_real_neff_error": 2.780693333972205e-15,
+        "passed": false,
+        "raw_complex_kappa_difference_rad_per_m": 2.5981635721769126e-08,
+        "reference_extraction_flag": "negative_kappa_squared",
+        "scope": "stored_scalar_coefficients"
+      },
+      "against_production_baseline": {
+        "actual_extraction_flag": "negative_kappa_squared",
+        "delta_beta_error_rad_per_m": 1.1613592564028192e-06,
+        "kappa_error_rad_per_m": 1.4818827557203295e-07,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 2.4847100595478322e-12,
+        "maximum_real_neff_error": 2.542348191060302e-13,
+        "passed": false,
+        "raw_complex_kappa_difference_rad_per_m": 1.4818827557203295e-07,
+        "reference_extraction_flag": "negative_kappa_squared",
+        "scope": "stored_scalar_coefficients"
+      },
+      "axis": "x_domain",
+      "setting": "x_domain_1p5",
+      "wavelength_m": 1.34e-06,
+      "z_m": 0.0015
+    },
+    {
+      "against_previous_setting": {
+        "actual_extraction_flag": "ok",
+        "delta_beta_error_rad_per_m": 1.876278002002682e-09,
+        "kappa_error_rad_per_m": 1.7699328069122975e-09,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 1.7355357897247435e-12,
+        "maximum_real_neff_error": 3.1779352388253772e-15,
+        "passed": true,
+        "raw_complex_kappa_difference_rad_per_m": 1.7699328069122975e-09,
+        "reference_extraction_flag": "ok",
+        "scope": "stored_scalar_coefficients"
+      },
+      "against_production_baseline": {
+        "actual_extraction_flag": "ok",
+        "delta_beta_error_rad_per_m": 8.386240168161792e-09,
+        "kappa_error_rad_per_m": 9.117213622908049e-10,
+        "kappa_gauge_flipped_for_comparison": false,
+        "maximum_loss_error_db": 1.9416842012196163e-12,
+        "maximum_real_neff_error": 2.3834514291190327e-15,
+        "passed": true,
+        "raw_complex_kappa_difference_rad_per_m": 9.117213622908049e-10,
+        "reference_extraction_flag": "ok",
+        "scope": "stored_scalar_coefficients"
+      },
+      "axis": "x_domain",
+      "setting": "x_domain_1p5",
+      "wavelength_m": 1.34e-06,
+      "z_m": 0.00075
+    }
+  ],
+  "d_control_m": [
+    -8e-06,
+    -4.8e-06,
+    -1.6e-06,
+    1.6e-06,
+    4.8e-06,
+    8e-06
+  ],
+  "elapsed_seconds": 2238.969000000012,
+  "exact_key_pilot_cache_entries_reused": 4,
+  "execution_completed": true,
+  "fresh_fde_solves": 46,
+  "geometry_source": "initial monotone geometry; no valid pilot candidate was published",
+  "long_run_eligible": false,
+  "max_fde_solves": 60,
+  "max_seconds": 2700,
+  "physical_device_validated": false,
+  "positions_m": [
+    0.0015,
+    0.00075
+  ],
+  "production_mesh_and_domain_changed": false,
+  "records": [
+    {
+      "anchor_field_overlaps": [],
+      "coefficients": {
+        "beta_lower": {
+          "imag": 4.6142934315793876e-11,
+          "real": 8720697.656766914
+        },
+        "beta_minus": {
+          "imag": 8.634363498970529e-11,
+          "real": 8720736.11183354
+        },
+        "beta_plus": {
+          "imag": -7.281950923954131e-10,
+          "real": 8773256.290015161
+        },
+        "beta_upper": {
+          "imag": -8.098165048778116e-10,
+          "real": 8773251.859034749
+        },
+        "delta_12": {
+          "imag": -4.2797971959680275e-10,
+          "real": 26277.10113391746
+        },
+        "delta_beta": {
+          "imag": -8.559594391936055e-10,
+          "real": 52554.20226783492
+        },
+        "delta_pm": {
+          "imag": -4.072693636925592e-10,
+          "real": 26260.089090810157
+        },
+        "extraction_flag": "negative_kappa_squared",
+        "kappa": {
+          "imag": 945.3914241411314,
+          "real": 5.829718638365583e-10
+        },
+        "kappa_profile_check": 1.2799904725528297e-05,
+        "lower_identity": "mode1@1.748807095",
+        "min_mode_overlap": 1.0,
+        "overlap_upper_lower": 5.0910280301832236e-11,
+        "supermode_identities": [
+          "mode1@1.759346953",
+          "mode2@1.748814807"
+        ],
+        "upper_identity": "mode1@1.759346064"
+      },
+      "extraction_valid": false,
+      "geometry": {
+        "box_thickness_m": 3e-06,
+        "d_c2c_m": 8e-06,
+        "h_gap_m": 1e-06,
+        "h_rib_m": 1.75e-07,
+        "h_wg_m": 3.5e-07,
+        "liquid_index": 1.55,
+        "state": "cross",
+        "w1_m": 1.8677383615142105e-06,
+        "w2_m": 2e-06
+      },
+      "mesh_cells_x": 528,
+      "mesh_cells_y": 208,
+      "mesh_factor": 1.0,
+      "setting": "baseline",
+      "wavelength_m": 1.26e-06,
+      "x_domain_factor": 1.0,
+      "x_span_m": 2.6000000000000002e-05,
+      "z_m": 0.0015
+    },
+    {
+      "anchor_field_overlaps": [],
+      "coefficients": {
+        "beta_lower": {
+          "imag": 4.6142934315793876e-11,
+          "real": 8720697.656766914
+        },
+        "beta_minus": {
+          "imag": -1.1663403494483662e-10,
+          "real": 8719073.805394782
+        },
+        "beta_plus": {
+          "imag": -1.1997216069819891e-09,
+          "real": 8733695.352931859
+        },
+        "beta_upper": {
+          "imag": -1.3974662144141592e-09,
+          "real": 8732148.354727393
+        },
+        "delta_12": {
+          "imag": -7.218045743649765e-10,
+          "real": 5725.3489802395925
+        },
+        "delta_beta": {
+          "imag": -1.443609148729953e-09,
+          "real": 11450.697960479185
+        },
+        "delta_pm": {
+          "imag": -5.415437860185762e-10,
+          "real": 7310.773768538609
+        },
+        "extraction_flag": "ok",
+        "kappa": {
+          "imag": 3.8159248516167274e-11,
+          "real": 4546.184350553954
+        },
+        "kappa_profile_check": 4610.507689324684,
+        "lower_identity": "mode1@1.748807095",
+        "min_mode_overlap": 1.0,
+        "overlap_upper_lower": 0.01222172218042734,
+        "supermode_identities": [
+          "mode1@1.751413591",
+          "mode2@1.748481456"
+        ],
+        "upper_identity": "mode1@1.751103364"
+      },
+      "extraction_valid": true,
+      "geometry": {
+        "box_thickness_m": 3e-06,
+        "d_c2c_m": 1.5881867761018131e-22,
+        "h_gap_m": 1e-06,
+        "h_rib_m": 1.75e-07,
+        "h_wg_m": 3.5e-07,
+        "liquid_index": 1.55,
+        "state": "cross",
+        "w1_m": 1.5011929088864672e-06,
+        "w2_m": 2e-06
+      },
+      "mesh_cells_x": 528,
+      "mesh_cells_y": 208,
+      "mesh_factor": 1.0,
+      "setting": "baseline",
+      "wavelength_m": 1.26e-06,
+      "x_domain_factor": 1.0,
+      "x_span_m": 2.6000000000000002e-05,
+      "z_m": 0.00075
+    },
+    {
+      "anchor_field_overlaps": [],
+      "coefficients": {
+        "beta_lower": {
+          "imag": 6.56834187478122e-11,
+          "real": 8111027.259891508
+        },
+        "beta_minus": {
+          "imag": 7.029665945145902e-11,
+          "real": 8111122.296961544
+        },
+        "beta_plus": {
+          "imag": -3.674720617831478e-08,
+          "real": 8168059.241532434
+        },
+        "beta_upper": {
+          "imag": -3.664068615636423e-08,
+          "real": 8168047.1662868885
+        },
+        "delta_12": {
+          "imag": -1.8353184787556022e-08,
+          "real": 28509.953197690193
+        },
+        "delta_beta": {
+          "imag": -3.6706369575112044e-08,
+          "real": 57019.906395380385
+        },
+        "delta_pm": {
+          "imag": -1.840875141888312e-08,
+          "real": 28468.47228544485
+        },
+        "extraction_flag": "negative_kappa_squared",
+        "kappa": {
+          "imag": -1537.3734313249436,
+          "real": 5.33761179695094e-10
+        },
+        "kappa_profile_check": 0.00010907920069459517,
+        "lower_identity": "mode1@1.729819510",
+        "min_mode_overlap": 1.0,
+        "overlap_upper_lower": 4.4882736995249756e-10,
+        "supermode_identities": [
+          "mode1@1.741982585",
+          "mode2@1.729839778"
+        ],
+        "upper_identity": "mode1@1.741980010"
+      },
+      "extraction_valid": false,
+      "geometry": {
+        "box_thickness_m": 3e-06,
+        "d_c2c_m": 8e-06,
+        "h_gap_m": 1e-06,
+        "h_rib_m": 1.75e-07,
+        "h_wg_m": 3.5e-07,
+        "liquid_index": 1.55,
+        "state": "cross",
+        "w1_m": 1.8677383615142105e-06,
+        "w2_m": 2e-06
+      },
+      "mesh_cells_x": 528,
+      "mesh_cells_y": 208,
+      "mesh_factor": 1.0,
+      "setting": "baseline",
+      "wavelength_m": 1.34e-06,
+      "x_domain_factor": 1.0,
+      "x_span_m": 2.6000000000000002e-05,
+      "z_m": 0.0015
+    },
+    {
+      "anchor_field_overlaps": [],
+      "coefficients": {
+        "beta_lower": {
+          "imag": 6.56834187478122e-11,
+          "real": 8111027.259891508
+        },
+        "beta_minus": {
+          "imag": -1.0562839519848616e-08,
+          "real": 8108309.146962017
+        },
+        "beta_plus": {
+          "imag": -5.174291528245107e-08,
+          "real": 8129331.07612445
+        },
+        "beta_upper": {
+          "imag": -6.191853532734566e-08,
+          "real": 8126799.43983776
+        },
+        "delta_12": {
+          "imag": -3.099210937304673e-08,
+          "real": 7886.089973126072
+        },
+        "delta_beta": {
+          "imag": -6.198421874609346e-08,
+          "real": 15772.179946252145
+        },
+        "delta_pm": {
+          "imag": -2.0590037881301226e-08,
+          "real": 10510.964581216685
+        },
+        "extraction_flag": "ok",
+        "kappa": {
+          "imag": 4.027199581115034e-09,
+          "real": 6949.0978812614285
+        },
+        "kappa_profile_check": 7079.018368056795,
+        "lower_identity": "mode1@1.729819510",
+        "min_mode_overlap": 1.0,
+        "overlap_upper_lower": 0.019503934631723664,
+        "supermode_identities": [
+          "mode1@1.733723121",
+          "mode2@1.729239824"
+        ],
+        "upper_identity": "mode1@1.733183205"
+      },
+      "extraction_valid": true,
+      "geometry": {
+        "box_thickness_m": 3e-06,
+        "d_c2c_m": 1.5881867761018131e-22,
+        "h_gap_m": 1e-06,
+        "h_rib_m": 1.75e-07,
+        "h_wg_m": 3.5e-07,
+        "liquid_index": 1.55,
+        "state": "cross",
+        "w1_m": 1.5011929088864672e-06,
+        "w2_m": 2e-06
+      },
+      "mesh_cells_x": 528,
+      "mesh_cells_y": 208,
+      "mesh_factor": 1.0,
+      "setting": "baseline",
+      "wavelength_m": 1.34e-06,
+      "x_domain_factor": 1.0,
+      "x_span_m": 2.6000000000000002e-05,
+      "z_m": 0.00075
+    },
+    {
+      "anchor_field_overlaps": [
+        0.9999962019553467,
+        0.9999958201702844,
+        0.9999962019274077,
+        0.9999958149730916
+      ],
+      "coefficients": {
+        "beta_lower": {
+          "imag": 1.1740238001087487e-10,
+          "real": 8721059.748382853
+        },
+        "beta_minus": {
+          "imag": 2.5037688082622646e-11,
+          "real": 8721097.606906908
+        },
+        "beta_plus": {
+          "imag": -1.2290026903621079e-08,
+          "real": 8773576.309537325
+        },
+        "beta_upper": {
+          "imag": -1.217815392489541e-08,
+          "real": 8773571.846365001
+        },
+        "delta_12": {
+          "imag": -6.1477781524531425e-09,
+          "real": 26256.048991073854
+        },
+        "delta_beta": {
+          "imag": -1.2295556304906285e-08,
+          "real": 52512.09798214771
+        },
+        "delta_pm": {
+          "imag": -6.157532295851851e-09,
+          "real": 26239.35131520871
+        },
+        "extraction_flag": "negative_kappa_squared",
+        "kappa": {
+          "imag": 936.2431194541526,
+          "real": -1.6372754613837026e-10
+        },
+        "kappa_profile_check": 1.287364817616895e-05,
+        "lower_identity": "mode1@1.748879708",
+        "min_mode_overlap": 1.0,
+        "overlap_upper_lower": 5.103231254291951e-11,
+        "supermode_identities": [
+          "mode1@1.759411128",
+          "mode2@1.748887300"
+        ],
+        "upper_identity": "mode1@1.759410233"
+      },
+      "extraction_valid": false,
+      "geometry": {
+        "box_thickness_m": 3e-06,
+        "d_c2c_m": 8e-06,
+        "h_gap_m": 1e-06,
+        "h_rib_m": 1.75e-07,
+        "h_wg_m": 3.5e-07,
+        "liquid_index": 1.55,
+        "state": "cross",
+        "w1_m": 1.8677383615142105e-06,
+        "w2_m": 2e-06
+      },
+      "mesh_cells_x": 660,
+      "mesh_cells_y": 260,
+      "mesh_factor": 1.25,
+      "setting": "mesh_1p25",
+      "wavelength_m": 1.26e-06,
+      "x_domain_factor": 1.0,
+      "x_span_m": 2.6000000000000002e-05,
+      "z_m": 0.0015
+    },
+    {
+      "anchor_field_overlaps": [
+        0.999996201012362,
+        0.9999958201702844,
+        0.9999783238060731,
+        0.9999766565142074
+      ],
+      "coefficients": {
+        "beta_lower": {
+          "imag": 1.1740238001087487e-10,
+          "real": 8721059.748382853
+        },
+        "beta_minus": {
+          "imag": -2.46878247793875e-09,
+          "real": 8719470.671159452
+        },
+        "beta_plus": {
+          "imag": -1.6762517282575244e-08,
+          "real": 8734284.555839343
+        },
+        "beta_upper": {
+          "imag": -1.9195066118738953e-08,
+          "real": 8732772.103698747
+        },
+        "delta_12": {
+          "imag": -9.656234249374914e-09,
+          "real": 5856.177657946944
+        },
+        "delta_beta": {
+          "imag": -1.931246849874983e-08,
+          "real": 11712.355315893888
+        },
+        "delta_pm": {
+          "imag": -7.1468674023182474e-09,
+          "real": 7406.9423399455845
+        },
+        "extraction_flag": "ok",
+        "kappa": {
+          "imag": 7.964795080878435e-10,
+          "real": 4535.193277672035
+        },
+        "kappa_profile_check": 4602.444429079016,
+        "lower_identity": "mode1@1.748879708",
+        "min_mode_overlap": 1.0,
+        "overlap_upper_lower": 0.012170717896912346,
+        "supermode_identities": [
+          "mode1@1.751531747",
+          "mode2@1.748561042"
+        ],
+        "upper_identity": "mode1@1.751228447"
+      },
+      "extraction_valid": true,
+      "geometry": {
+        "box_thickness_m": 3e-06,
+        "d_c2c_m": 1.5881867761018131e-22,
+        "h_gap_m": 1e-06,
+        "h_rib_m": 1.75e-07,
+        "h_wg_m": 3.5e-07,
+        "liquid_index": 1.55,
+        "state": "cross",
+        "w1_m": 1.5011929088864672e-06,
+        "w2_m": 2e-06
+      },
+      "mesh_cells_x": 660,
+      "mesh_cells_y": 260,
+      "mesh_factor": 1.25,
+      "setting": "mesh_1p25",
+      "wavelength_m": 1.26e-06,
+      "x_domain_factor": 1.0,
+      "x_span_m": 2.6000000000000002e-05,
+      "z_m": 0.00075
+    },
+    {
+      "anchor_field_overlaps": [
+        0.999996509093354,
+        0.9999957625768943,
+        0.9999965087858114,
+        0.9999957499281591
+      ],
+      "coefficients": {
+        "beta_lower": {
+          "imag": 8.723048282075745e-11,
+          "real": 8111602.509875331
+        },
+        "beta_minus": {
+          "imag": -4.482012001490524e-11,
+          "real": 8111696.1188887805
+        },
+        "beta_plus": {
+          "imag": -2.2593924050701568e-07,
+          "real": 8168204.8882507365
+        },
+        "beta_upper": {
+          "imag": -2.2598942269544846e-07,
+          "real": 8168192.70090524
+        },
+        "delta_12": {
+          "imag": -1.130383265891346e-07,
+          "real": 28295.095514954533
+        },
+        "delta_beta": {
+          "imag": -2.260766531782692e-07,
+          "real": 56590.19102990907
+        },
+        "delta_pm": {
+          "imag": -1.1294721019350038e-07,
+          "real": 28254.384680978023
+        },
+        "extraction_flag": "negative_kappa_squared",
+        "kappa": {
+          "imag": -1517.2924898366211,
+          "real": -4.729689422320368e-09
+        },
+        "kappa_profile_check": 0.00010966699570769597,
+        "lower_identity": "mode1@1.729942192",
+        "min_mode_overlap": 1.0,
+        "overlap_upper_lower": 4.5041242076524533e-10,
+        "supermode_identities": [
+          "mode1@1.742013647",
+          "mode2@1.729962156"
+        ],
+        "upper_identity": "mode1@1.742011048"
+      },
+      "extraction_valid": false,
+      "geometry": {
+        "box_thickness_m": 3e-06,
+        "d_c2c_m": 8e-06,
+        "h_gap_m": 1e-06,
+        "h_rib_m": 1.75e-07,
+        "h_wg_m": 3.5e-07,
+        "liquid_index": 1.55,
+        "state": "cross",
+        "w1_m": 1.8677383615142105e-06,
+        "w2_m": 2e-06
+      },
+      "mesh_cells_x": 660,
+      "mesh_cells_y": 260,
+      "mesh_factor": 1.25,
+      "setting": "mesh_1p25",
+      "wavelength_m": 1.34e-06,
+      "x_domain_factor": 1.0,
+      "x_span_m": 2.6000000000000002e-05,
+      "z_m": 0.0015
+    },
+    {
+      "anchor_field_overlaps": [
+        0.9999965242941539,
+        0.9999957625768943,
+        0.9999949089552854,
+        0.9999946213141857
+      ],
+      "coefficients": {
+        "beta_lower": {
+          "imag": 8.723048282075745e-11,
+          "real": 8111602.509875331
+        },
+        "beta_minus": {
+          "imag": -6.000161693617252e-08,
+          "real": 8108876.396045667
+        },
+        "beta_plus": {
+          "imag": -3.0046730914573866e-07,
+          "real": 8129778.937007555
+        },
+        "beta_upper": {
+          "imag": -3.5746519838880113e-07,
+          "real": 8127238.865425373
+        },
+        "delta_12": {
+          "imag": -1.7877621443581094e-07,
+          "real": 7818.177775021177
+        },
+        "delta_beta": {
+          "imag": -3.575524288716219e-07,
+          "real": 15636.355550042354
+        },
+        "delta_pm": {
+          "imag": -1.2023284610478307e-07,
+          "real": 10451.270480943844
+        },
+        "extraction_flag": "ok",
+        "kappa": {
+          "imag": 2.0346388511916773e-08,
+          "real": 6935.787694560228
+        },
+        "kappa_profile_check": 7065.142927205565,
+        "lower_identity": "mode1@1.729942192",
+        "min_mode_overlap": 1.0,
+        "overlap_upper_lower": 0.019435359458986508,
+        "supermode_identities": [
+          "mode1@1.733818635",
+          "mode2@1.729360800"
+        ],
+        "upper_identity": "mode1@1.733276920"
+      },
+      "extraction_valid": true,
+      "geometry": {
+        "box_thickness_m": 3e-06,
+        "d_c2c_m": 1.5881867761018131e-22,
+        "h_gap_m": 1e-06,
+        "h_rib_m": 1.75e-07,
+        "h_wg_m": 3.5e-07,
+        "liquid_index": 1.55,
+        "state": "cross",
+        "w1_m": 1.5011929088864672e-06,
+        "w2_m": 2e-06
+      },
+      "mesh_cells_x": 660,
+      "mesh_cells_y": 260,
+      "mesh_factor": 1.25,
+      "setting": "mesh_1p25",
+      "wavelength_m": 1.34e-06,
+      "x_domain_factor": 1.0,
+      "x_span_m": 2.6000000000000002e-05,
+      "z_m": 0.00075
+    },
+    {
+      "anchor_field_overlaps": [
+        0.9999936085074398,
+        0.9999952470867002,
+        0.9999936074948792,
+        0.9999952206762184
+      ],
+      "coefficients": {
+        "beta_lower": {
+          "imag": -8.14978325369874e-11,
+          "real": 8725770.10482296
+        },
+        "beta_minus": {
+          "imag": 8.655779809654061e-12,
+          "real": 8725807.29184276
+        },
+        "beta_plus": {
+          "imag": -2.470762170725681e-08,
+          "real": 8778274.045239959
+        },
+        "beta_upper": {
+          "imag": -2.4900241241451306e-08,
+          "real": 8778269.705448342
+        },
+        "delta_12": {
+          "imag": -1.240937170445716e-08,
+          "real": 26249.800312691368
+        },
+        "delta_beta": {
+          "imag": -2.481874340891432e-08,
+          "real": 52499.600625382736
+        },
+        "delta_pm": {
+          "imag": -1.2358138743533232e-08,
+          "real": 26233.376698599197
+        },
+        "extraction_flag": "negative_kappa_squared",
+        "kappa": {
+          "imag": 928.4198649126959,
+          "real": 1.6671555120677e-09
+        },
+        "kappa_profile_check": 1.1976265017900275e-05,
+        "lower_identity": "mode1@1.749824300",
+        "min_mode_overlap": 1.0,
+        "overlap_upper_lower": 4.732772224513515e-11,
+        "supermode_identities": [
+          "mode1@1.760353190",
+          "mode2@1.749831757"
+        ],
+        "upper_identity": "mode1@1.760352319"
+      },
+      "extraction_valid": false,
+      "geometry": {
+        "box_thickness_m": 3e-06,
+        "d_c2c_m": 8e-06,
+        "h_gap_m": 1e-06,
+        "h_rib_m": 1.75e-07,
+        "h_wg_m": 3.5e-07,
+        "liquid_index": 1.55,
+        "state": "cross",
+        "w1_m": 1.8677383615142105e-06,
+        "w2_m": 2e-06
+      },
+      "mesh_cells_x": 792,
+      "mesh_cells_y": 312,
+      "mesh_factor": 1.5,
+      "setting": "mesh_1p5",
+      "wavelength_m": 1.26e-06,
+      "x_domain_factor": 1.0,
+      "x_span_m": 2.6000000000000002e-05,
+      "z_m": 0.0015
+    },
+    {
+      "anchor_field_overlaps": [
+        0.9999944359439393,
+        0.9999952470867002,
+        0.9999882971181674,
+        0.9999903836908799
+      ],
+      "coefficients": {
+        "beta_lower": {
+          "imag": -8.14978325369874e-11,
+          "real": 8725770.10482296
+        },
+        "beta_minus": {
+          "imag": -5.079301880014098e-09,
+          "real": 8724144.223551217
+        },
+        "beta_plus": {
+          "imag": -3.29267266051291e-08,
+          "real": 8738515.003328541
+        },
+        "beta_upper": {
+          "imag": -3.792532294846286e-08,
+          "real": 8736964.879506573
+        },
+        "delta_12": {
+          "imag": -1.8921912557962937e-08,
+          "real": 5597.387341806665
+        },
+        "delta_beta": {
+          "imag": -3.7843825115925874e-08,
+          "real": 11194.77468361333
+        },
+        "delta_pm": {
+          "imag": -1.3923712362557501e-08,
+          "real": 7185.389888661914
+        },
+        "extraction_flag": "ok",
+        "kappa": {
+          "imag": 1.301972359012189e-09,
+          "real": 4505.450343513663
+        },
+        "kappa_profile_check": 4569.511869694222,
+        "lower_identity": "mode1@1.749824300",
+        "min_mode_overlap": 1.0,
+        "overlap_upper_lower": 0.01205468361461071,
+        "supermode_identities": [
+          "mode1@1.752380101",
+          "mode2@1.749498254"
+        ],
+        "upper_identity": "mode1@1.752069247"
+      },
+      "extraction_valid": true,
+      "geometry": {
+        "box_thickness_m": 3e-06,
+        "d_c2c_m": 1.5881867761018131e-22,
+        "h_gap_m": 1e-06,
+        "h_rib_m": 1.75e-07,
+        "h_wg_m": 3.5e-07,
+        "liquid_index": 1.55,
+        "state": "cross",
+        "w1_m": 1.5011929088864672e-06,
+        "w2_m": 2e-06
+      },
+      "mesh_cells_x": 792,
+      "mesh_cells_y": 312,
+      "mesh_factor": 1.5,
+      "setting": "mesh_1p5",
+      "wavelength_m": 1.26e-06,
+      "x_domain_factor": 1.0,
+      "x_span_m": 2.6000000000000002e-05,
+      "z_m": 0.00075
+    },
+    {
+      "anchor_field_overlaps": [
+        0.9999943816847678,
+        0.9999952176414703,
+        0.9999943799360658,
+        0.9999951581377472
+      ],
+      "coefficients": {
+        "beta_lower": {
+          "imag": -2.0858694890846716e-10,
+          "real": 8115697.832286838
+        },
+        "beta_minus": {
+          "imag": -1.9456364351346615e-10,
+          "real": 8115789.9986294685
+        },
+        "beta_plus": {
+          "imag": -3.1273524264898985e-07,
+          "real": 8172435.308119436
+        },
+        "beta_upper": {
+          "imag": -3.1284961556520976e-07,
+          "real": 8172423.430149922
+        },
+        "delta_12": {
+          "imag": -1.5632051430815064e-07,
+          "real": 28362.798931541853
+        },
+        "delta_beta": {
+          "imag": -3.126410286163013e-07,
+          "real": 56725.597863083705
+        },
+        "delta_pm": {
+          "imag": -1.562703395027382e-07,
+          "real": 28322.65474498365
+        },
+        "extraction_flag": "negative_kappa_squared",
+        "kappa": {
+          "imag": -1508.506356475448,
+          "real": -5.1020292667751055e-09
+        },
+        "kappa_profile_check": 0.00010274799286172332,
+        "lower_identity": "mode1@1.730815592",
+        "min_mode_overlap": 1.0,
+        "overlap_upper_lower": 4.207796123898192e-10,
+        "supermode_identities": [
+          "mode1@1.742915858",
+          "mode2@1.730835248"
+        ],
+        "upper_identity": "mode1@1.742913325"
+      },
+      "extraction_valid": false,
+      "geometry": {
+        "box_thickness_m": 3e-06,
+        "d_c2c_m": 8e-06,
+        "h_gap_m": 1e-06,
+        "h_rib_m": 1.75e-07,
+        "h_wg_m": 3.5e-07,
+        "liquid_index": 1.55,
+        "state": "cross",
+        "w1_m": 1.8677383615142105e-06,
+        "w2_m": 2e-06
+      },
+      "mesh_cells_x": 792,
+      "mesh_cells_y": 312,
+      "mesh_factor": 1.5,
+      "setting": "mesh_1p5",
+      "wavelength_m": 1.34e-06,
+      "x_domain_factor": 1.0,
+      "x_span_m": 2.6000000000000002e-05,
+      "z_m": 0.0015
+    },
+    {
+      "anchor_field_overlaps": [
+        0.9999950480821101,
+        0.9999952176414703,
+        0.9999750677097745,
+        0.9999776416554002
+      ],
+      "coefficients": {
+        "beta_lower": {
+          "imag": -2.0858694890846716e-10,
+          "real": 8115697.832286838
+        },
+        "beta_minus": {
+          "imag": -8.021730524943314e-08,
+          "real": 8112952.238371489
+        },
+        "beta_plus": {
+          "imag": -4.0225271024678377e-07,
+          "real": 8133530.738320772
+        },
+        "beta_upper": {
+          "imag": -4.792306790452124e-07,
+          "real": 8130969.318843203
+        },
+        "delta_12": {
+          "imag": -2.3951104604815196e-07,
+          "real": 7635.743278182112
+        },
+        "delta_beta": {
+          "imag": -4.790220920963039e-07,
+          "real": 15271.486556364223
+        },
+        "delta_pm": {
+          "imag": -1.6101770249867532e-07,
+          "real": 10289.249974641483
+        },
+        "extraction_flag": "ok",
+        "kappa": {
+          "imag": 2.4953116459314074e-08,
+          "real": 6896.67235921473
+        },
+        "kappa_profile_check": 7022.581687263841,
+        "lower_identity": "mode1@1.730815592",
+        "min_mode_overlap": 1.0,
+        "overlap_upper_lower": 0.019270661117560598,
+        "supermode_identities": [
+          "mode1@1.734618773",
+          "mode2@1.730230045"
+        ],
+        "upper_identity": "mode1@1.734072505"
+      },
+      "extraction_valid": true,
+      "geometry": {
+        "box_thickness_m": 3e-06,
+        "d_c2c_m": 1.5881867761018131e-22,
+        "h_gap_m": 1e-06,
+        "h_rib_m": 1.75e-07,
+        "h_wg_m": 3.5e-07,
+        "liquid_index": 1.55,
+        "state": "cross",
+        "w1_m": 1.5011929088864672e-06,
+        "w2_m": 2e-06
+      },
+      "mesh_cells_x": 792,
+      "mesh_cells_y": 312,
+      "mesh_factor": 1.5,
+      "setting": "mesh_1p5",
+      "wavelength_m": 1.34e-06,
+      "x_domain_factor": 1.0,
+      "x_span_m": 2.6000000000000002e-05,
+      "z_m": 0.00075
+    },
+    {
+      "anchor_field_overlaps": [
+        0.9999634850738237,
+        0.9999765095126525,
+        0.9999634857875844,
+        0.9999765108298235
+      ],
+      "coefficients": {
+        "beta_lower": {
+          "imag": 4.419065867961922e-11,
+          "real": 8720697.65676692
+        },
+        "beta_minus": {
+          "imag": 9.99371583141689e-11,
+          "real": 8720736.11183355
+        },
+        "beta_plus": {
+          "imag": -7.407328892564856e-10,
+          "real": 8773256.290015278
+        },
+        "beta_upper": {
+          "imag": -7.357413135155033e-10,
+          "real": 8773251.859034859
+        },
+        "delta_12": {
+          "imag": -3.8996598609756124e-10,
+          "real": 26277.101133969612
+        },
+        "delta_beta": {
+          "imag": -7.799319721951225e-10,
+          "real": 52554.202267939225
+        },
+        "delta_pm": {
+          "imag": -4.203350237853273e-10,
+          "real": 26260.089090864174
+        },
+        "extraction_flag": "negative_kappa_squared",
+        "kappa": {
+          "imag": 945.3914240903151,
+          "real": -8.36541877752267e-10
+        },
+        "kappa_profile_check": 1.281766385930262e-05,
+        "lower_identity": "mode1@1.748807095",
+        "min_mode_overlap": 1.0,
+        "overlap_upper_lower": 5.0898658066883305e-11,
+        "supermode_identities": [
+          "mode1@1.759346953",
+          "mode2@1.748814807"
+        ],
+        "upper_identity": "mode1@1.759346064"
+      },
+      "extraction_valid": false,
+      "geometry": {
+        "box_thickness_m": 3e-06,
+        "d_c2c_m": 8e-06,
+        "h_gap_m": 1e-06,
+        "h_rib_m": 1.75e-07,
+        "h_wg_m": 3.5e-07,
+        "liquid_index": 1.55,
+        "state": "cross",
+        "w1_m": 1.8677383615142105e-06,
+        "w2_m": 2e-06
+      },
+      "mesh_cells_x": 660,
+      "mesh_cells_y": 208,
+      "mesh_factor": 1.0,
+      "setting": "x_domain_1p25",
+      "wavelength_m": 1.26e-06,
+      "x_domain_factor": 1.25,
+      "x_span_m": 3.2500000000000004e-05,
+      "z_m": 0.0015
+    },
+    {
+      "anchor_field_overlaps": [
+        0.9999735568541573,
+        0.9999765095126525,
+        0.999973763205105,
+        0.9999760123068261
+      ],
+      "coefficients": {
+        "beta_lower": {
+          "imag": 4.419065867961922e-11,
+          "real": 8720697.65676692
+        },
+        "beta_minus": {
+          "imag": -1.1092397894372936e-10,
+          "real": 8719073.805394778
+        },
+        "beta_plus": {
+          "imag": -1.1462875865016942e-09,
+          "real": 8733695.352931853
+        },
+        "beta_upper": {
+          "imag": -1.2058375767238542e-09,
+          "real": 8732148.354727395
+        },
+        "delta_12": {
+          "imag": -6.250141177017367e-10,
+          "real": 5725.34898023773
+        },
+        "delta_beta": {
+          "imag": -1.2500282354034734e-09,
+          "real": 11450.69796047546
+        },
+        "delta_pm": {
+          "imag": -5.176818037789824e-10,
+          "real": 7310.773768537678
+        },
+        "extraction_flag": "ok",
+        "kappa": {
+          "imag": -4.5363450796636284e-11,
+          "real": 4546.184350554802
+        },
+        "kappa_profile_check": 4607.215042531621,
+        "lower_identity": "mode1@1.748807095",
+        "min_mode_overlap": 1.0,
+        "overlap_upper_lower": 0.012199037627019434,
+        "supermode_identities": [
+          "mode1@1.751413591",
+          "mode2@1.748481456"
+        ],
+        "upper_identity": "mode1@1.751103364"
+      },
+      "extraction_valid": true,
+      "geometry": {
+        "box_thickness_m": 3e-06,
+        "d_c2c_m": 1.5881867761018131e-22,
+        "h_gap_m": 1e-06,
+        "h_rib_m": 1.75e-07,
+        "h_wg_m": 3.5e-07,
+        "liquid_index": 1.55,
+        "state": "cross",
+        "w1_m": 1.5011929088864672e-06,
+        "w2_m": 2e-06
+      },
+      "mesh_cells_x": 660,
+      "mesh_cells_y": 208,
+      "mesh_factor": 1.0,
+      "setting": "x_domain_1p25",
+      "wavelength_m": 1.26e-06,
+      "x_domain_factor": 1.25,
+      "x_span_m": 3.2500000000000004e-05,
+      "z_m": 0.00075
+    },
+    {
+      "anchor_field_overlaps": [
+        0.9999644571343891,
+        0.999973448488879,
+        0.9999644591188422,
+        0.999973453137144
+      ],
+      "coefficients": {
+        "beta_lower": {
+          "imag": 9.216566739292538e-12,
+          "real": 8111027.259891501
+        },
+        "beta_minus": {
+          "imag": -7.13534646379728e-11,
+          "real": 8111122.296961544
+        },
+        "beta_plus": {
+          "imag": -3.663908272269406e-08,
+          "real": 8168059.241533615
+        },
+        "beta_upper": {
+          "imag": -3.6668768784293417e-08,
+          "real": 8168047.166288047
+        },
+        "delta_12": {
+          "imag": -1.8338992675516356e-08,
+          "real": 28509.9531982732
+        },
+        "delta_beta": {
+          "imag": -3.667798535103271e-08,
+          "real": 57019.9063965464
+        },
+        "delta_pm": {
+          "imag": -1.828386462902804e-08,
+          "real": 28468.472286035307
+        },
+        "extraction_flag": "negative_kappa_squared",
+        "kappa": {
+          "imag": -1537.373431202739,
+          "real": -1.5156560937295771e-09
+        },
+        "kappa_profile_check": 0.00010922704572736513,
+        "lower_identity": "mode1@1.729819510",
+        "min_mode_overlap": 1.0,
+        "overlap_upper_lower": 4.4866972519814003e-10,
+        "supermode_identities": [
+          "mode1@1.741982585",
+          "mode2@1.729839778"
+        ],
+        "upper_identity": "mode1@1.741980010"
+      },
+      "extraction_valid": false,
+      "geometry": {
+        "box_thickness_m": 3e-06,
+        "d_c2c_m": 8e-06,
+        "h_gap_m": 1e-06,
+        "h_rib_m": 1.75e-07,
+        "h_wg_m": 3.5e-07,
+        "liquid_index": 1.55,
+        "state": "cross",
+        "w1_m": 1.8677383615142105e-06,
+        "w2_m": 2e-06
+      },
+      "mesh_cells_x": 660,
+      "mesh_cells_y": 208,
+      "mesh_factor": 1.0,
+      "setting": "x_domain_1p25",
+      "wavelength_m": 1.34e-06,
+      "x_domain_factor": 1.25,
+      "x_span_m": 3.2500000000000004e-05,
+      "z_m": 0.0015
+    },
+    {
+      "anchor_field_overlaps": [
+        0.9999724488433529,
+        0.999973448488879,
+        0.9999725034993373,
+        0.9999731273794429
+      ],
+      "coefficients": {
+        "beta_lower": {
+          "imag": 9.216566739292538e-12,
+          "real": 8111027.259891501
+        },
+        "beta_minus": {
+          "imag": -1.0601034802357603e-08,
+          "real": 8108309.146962021
+        },
+        "beta_plus": {
+          "imag": -5.184033789324697e-08,
+          "real": 8129331.07612446
+        },
+        "beta_upper": {
+          "imag": -6.1931099662351e-08,
+          "real": 8126799.439837763
+        },
+        "delta_12": {
+          "imag": -3.097015811454514e-08,
+          "real": 7886.089973131195
+        },
+        "delta_beta": {
+          "imag": -6.194031622909028e-08,
+          "real": 15772.17994626239
+        },
+        "delta_pm": {
+          "imag": -2.0619651545444683e-08,
+          "real": 10510.964581219945
+        },
+        "extraction_flag": "ok",
+        "kappa": {
+          "imag": 3.9574958896891204e-09,
+          "real": 6949.097881260546
+        },
+        "kappa_profile_check": 7073.982357577409,
+        "lower_identity": "mode1@1.729819510",
+        "min_mode_overlap": 1.0,
+        "overlap_upper_lower": 0.019465112020815783,
+        "supermode_identities": [
+          "mode1@1.733723121",
+          "mode2@1.729239824"
+        ],
+        "upper_identity": "mode1@1.733183205"
+      },
+      "extraction_valid": true,
+      "geometry": {
+        "box_thickness_m": 3e-06,
+        "d_c2c_m": 1.5881867761018131e-22,
+        "h_gap_m": 1e-06,
+        "h_rib_m": 1.75e-07,
+        "h_wg_m": 3.5e-07,
+        "liquid_index": 1.55,
+        "state": "cross",
+        "w1_m": 1.5011929088864672e-06,
+        "w2_m": 2e-06
+      },
+      "mesh_cells_x": 660,
+      "mesh_cells_y": 208,
+      "mesh_factor": 1.0,
+      "setting": "x_domain_1p25",
+      "wavelength_m": 1.34e-06,
+      "x_domain_factor": 1.25,
+      "x_span_m": 3.2500000000000004e-05,
+      "z_m": 0.00075
+    },
+    {
+      "anchor_field_overlaps": [
+        0.999927760536265,
+        0.9999060998856228,
+        0.9999277620608549,
+        0.9999061118044127
+      ],
+      "coefficients": {
+        "beta_lower": {
+          "imag": 2.254745155693369e-11,
+          "real": 8720697.656766912
+        },
+        "beta_minus": {
+          "imag": -1.0549908120042621e-12,
+          "real": 8720736.111833563
+        },
+        "beta_plus": {
+          "imag": -7.396752709229382e-10,
+          "real": 8773256.290015284
+        },
+        "beta_upper": {
+          "imag": -7.188115796509405e-10,
+          "real": 8773251.85903486
+        },
+        "delta_12": {
+          "imag": -3.706795156039371e-10,
+          "real": 26277.10113397427
+        },
+        "delta_beta": {
+          "imag": -7.413590312078742e-10,
+          "real": 52554.20226794854
+        },
+        "delta_pm": {
+          "imag": -3.69310140055467e-10,
+          "real": 26260.08909086045
+        },
+        "extraction_flag": "negative_kappa_squared",
+        "kappa": {
+          "imag": 945.3914243232128,
+          "real": 4.470734419110182e-11
+        },
+        "kappa_profile_check": 1.2788916109397132e-05,
+        "lower_identity": "mode1@1.748807095",
+        "min_mode_overlap": 1.0,
+        "overlap_upper_lower": 5.0993568208622913e-11,
+        "supermode_identities": [
+          "mode1@1.759346953",
+          "mode2@1.748814807"
+        ],
+        "upper_identity": "mode1@1.759346064"
+      },
+      "extraction_valid": false,
+      "geometry": {
+        "box_thickness_m": 3e-06,
+        "d_c2c_m": 8e-06,
+        "h_gap_m": 1e-06,
+        "h_rib_m": 1.75e-07,
+        "h_wg_m": 3.5e-07,
+        "liquid_index": 1.55,
+        "state": "cross",
+        "w1_m": 1.8677383615142105e-06,
+        "w2_m": 2e-06
+      },
+      "mesh_cells_x": 792,
+      "mesh_cells_y": 208,
+      "mesh_factor": 1.0,
+      "setting": "x_domain_1p5",
+      "wavelength_m": 1.26e-06,
+      "x_domain_factor": 1.5,
+      "x_span_m": 3.9e-05,
+      "z_m": 0.0015
+    },
+    {
+      "anchor_field_overlaps": [
+        0.9998097322914887,
+        0.9999060998856228,
+        0.999820755592283,
+        0.9998951122072852
+      ],
+      "coefficients": {
+        "beta_lower": {
+          "imag": 2.254745155693369e-11,
+          "real": 8720697.656766912
+        },
+        "beta_minus": {
+          "imag": -2.567043611218466e-10,
+          "real": 8719073.805394782
+        },
+        "beta_plus": {
+          "imag": -1.1575058509680234e-09,
+          "real": 8733695.35293186
+        },
+        "beta_upper": {
+          "imag": -1.2805017998986392e-09,
+          "real": 8732148.354727391
+        },
+        "delta_12": {
+          "imag": -6.515246257277865e-10,
+          "real": 5725.3489802395925
+        },
+        "delta_beta": {
+          "imag": -1.303049251455573e-09,
+          "real": 11450.697960479185
+        },
+        "delta_pm": {
+          "imag": -4.504007449230884e-10,
+          "real": 7310.7737685395405
+        },
+        "extraction_flag": "ok",
+        "kappa": {
+          "imag": 9.621868944750035e-11,
+          "real": 4546.184350555452
+        },
+        "kappa_profile_check": 4618.97876403165,
+        "lower_identity": "mode1@1.748807095",
+        "min_mode_overlap": 1.0,
+        "overlap_upper_lower": 0.01226679061712796,
+        "supermode_identities": [
+          "mode1@1.751413591",
+          "mode2@1.748481456"
+        ],
+        "upper_identity": "mode1@1.751103364"
+      },
+      "extraction_valid": true,
+      "geometry": {
+        "box_thickness_m": 3e-06,
+        "d_c2c_m": 1.5881867761018131e-22,
+        "h_gap_m": 1e-06,
+        "h_rib_m": 1.75e-07,
+        "h_wg_m": 3.5e-07,
+        "liquid_index": 1.55,
+        "state": "cross",
+        "w1_m": 1.5011929088864672e-06,
+        "w2_m": 2e-06
+      },
+      "mesh_cells_x": 792,
+      "mesh_cells_y": 208,
+      "mesh_factor": 1.0,
+      "setting": "x_domain_1p5",
+      "wavelength_m": 1.26e-06,
+      "x_domain_factor": 1.5,
+      "x_span_m": 3.9e-05,
+      "z_m": 0.00075
+    },
+    {
+      "anchor_field_overlaps": [
+        0.9999281082758732,
+        0.9998995286835497,
+        0.9999281125445977,
+        0.9998995625373305
+      ],
+      "coefficients": {
+        "beta_lower": {
+          "imag": -8.334635115319913e-11,
+          "real": 8111027.259891503
+        },
+        "beta_minus": {
+          "imag": -1.911489144235568e-11,
+          "real": 8111122.296961557
+        },
+        "beta_plus": {
+          "imag": -3.655649763353054e-08,
+          "real": 8168059.241533626
+        },
+        "beta_upper": {
+          "imag": -3.667307588169959e-08,
+          "real": 8168047.166288044
+        },
+        "delta_12": {
+          "imag": -1.8294864765273197e-08,
+          "real": 28509.953198270872
+        },
+        "delta_beta": {
+          "imag": -3.6589729530546394e-08,
+          "real": 57019.906396541744
+        },
+        "delta_pm": {
+          "imag": -1.8268691371044093e-08,
+          "real": 28468.472286034375
+        },
+        "extraction_flag": "negative_kappa_squared",
+        "kappa": {
+          "imag": -1537.373431176763,
+          "real": -9.782946663767329e-10
+        },
+        "kappa_profile_check": 0.00010900983205025952,
+        "lower_identity": "mode1@1.729819510",
+        "min_mode_overlap": 1.0,
+        "overlap_upper_lower": 4.4970063929844746e-10,
+        "supermode_identities": [
+          "mode1@1.741982585",
+          "mode2@1.729839778"
+        ],
+        "upper_identity": "mode1@1.741980010"
+      },
+      "extraction_valid": false,
+      "geometry": {
+        "box_thickness_m": 3e-06,
+        "d_c2c_m": 8e-06,
+        "h_gap_m": 1e-06,
+        "h_rib_m": 1.75e-07,
+        "h_wg_m": 3.5e-07,
+        "liquid_index": 1.55,
+        "state": "cross",
+        "w1_m": 1.8677383615142105e-06,
+        "w2_m": 2e-06
+      },
+      "mesh_cells_x": 792,
+      "mesh_cells_y": 208,
+      "mesh_factor": 1.0,
+      "setting": "x_domain_1p5",
+      "wavelength_m": 1.34e-06,
+      "x_domain_factor": 1.5,
+      "x_span_m": 3.9e-05,
+      "z_m": 0.0015
+    },
+    {
+      "anchor_field_overlaps": [
+        0.9998109621854732,
+        0.9998995286835497,
+        0.9998228767574378,
+        0.9998875638220484
+      ],
+      "coefficients": {
+        "beta_lower": {
+          "imag": -8.334635115319913e-11,
+          "real": 8111027.259891503
+        },
+        "beta_minus": {
+          "imag": -1.0472777814472128e-08,
+          "real": 8108309.146962006
+        },
+        "beta_plus": {
+          "imag": -5.176827554746701e-08,
+          "real": 8129331.0761244465
+        },
+        "beta_upper": {
+          "imag": -6.17978923677584e-08,
+          "real": 8126799.439837763
+        },
+        "delta_12": {
+          "imag": -3.08572730083026e-08,
+          "real": 7886.089973130263
+        },
+        "delta_beta": {
+          "imag": -6.17145460166052e-08,
+          "real": 15772.179946260527
+        },
+        "delta_pm": {
+          "imag": -2.064774886649744e-08,
+          "real": 10510.96458122041
+        },
+        "extraction_flag": "ok",
+        "kappa": {
+          "imag": 3.786890716014716e-09,
+          "real": 6949.097881262308
+        },
+        "kappa_profile_check": 7092.182701585632,
+        "lower_identity": "mode1@1.729819510",
+        "min_mode_overlap": 1.0,
+        "overlap_upper_lower": 0.01958010658730926,
+        "supermode_identities": [
+          "mode1@1.733723121",
+          "mode2@1.729239824"
+        ],
+        "upper_identity": "mode1@1.733183205"
+      },
+      "extraction_valid": true,
+      "geometry": {
+        "box_thickness_m": 3e-06,
+        "d_c2c_m": 1.5881867761018131e-22,
+        "h_gap_m": 1e-06,
+        "h_rib_m": 1.75e-07,
+        "h_wg_m": 3.5e-07,
+        "liquid_index": 1.55,
+        "state": "cross",
+        "w1_m": 1.5011929088864672e-06,
+        "w2_m": 2e-06
+      },
+      "mesh_cells_x": 792,
+      "mesh_cells_y": 208,
+      "mesh_factor": 1.0,
+      "setting": "x_domain_1p5",
+      "wavelength_m": 1.34e-06,
+      "x_domain_factor": 1.5,
+      "x_span_m": 3.9e-05,
+      "z_m": 0.00075
+    }
+  ],
+  "scope": "cross-state output and aligned-guide sentinel sections at both band edges; no full-device or Block 0 certificate",
+  "script_sha256": "b6f9685d376fa6cb7b7181f3e48b94cb94b41b04f682f90455ee3ae519091a6d",
+  "settings": [
+    [
+      "baseline",
+      1.0,
+      1.0
+    ],
+    [
+      "mesh_1p25",
+      1.25,
+      1.0
+    ],
+    [
+      "mesh_1p5",
+      1.5,
+      1.0
+    ],
+    [
+      "x_domain_1p25",
+      1.0,
+      1.25
+    ],
+    [
+      "x_domain_1p5",
+      1.0,
+      1.5
+    ]
+  ],
+  "source_identity": {
+    "implementation": "c252dc0063c9874f130d48eadbfbaab4bf9310dd22547e53d26a9246f6ce16ef",
+    "installation": {
+      "api_sha256": "fe16a536bb41d432780b8e4f2ab642b1c4f54cef44993f73cd5b011c569711dc",
+      "executable_sha256": "0b3ff551f7e280a26652654cf3892ab799e9dee520db6ed5b0030106177e2032"
+    },
+    "workflow": "d737d0aa66ad53d179b932f4c9e13de18089ba8ff285a99b5874384c3f4e4ad9"
+  },
+  "status": "review",
+  "w_control_m": [
+    1.1346474562587244e-06,
+    1.2812656373098217e-06,
+    1.427883818360919e-06,
+    1.574501999412016e-06,
+    1.7211201804631132e-06,
+    1.8677383615142105e-06
+  ]
+}

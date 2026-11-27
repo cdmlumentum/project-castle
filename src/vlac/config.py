@@ -105,6 +105,7 @@ class SolverConfig:
     minimum_mode_overlap: float = 0.55
     tracking_method: str = "legacy"
     tracking_recovery_depth: int = 3
+    endpoint_domain_policy: str = "strict"
     field_overlap_crosscheck_max_basis_overlap: float = 0.95
     large_separation_check_m: float = 7e-6
     mesh_convergence_neff_tolerance: float = 2e-5
@@ -313,6 +314,14 @@ class WorkflowConfig:
             raise ValueError('Unknown tracking method.')
         if s.tracking_method != 'legacy' and s.engine != 'native':
             raise ValueError('guarded_translation_v1 currently requires the native raw FDE backend.')
+        if s.endpoint_domain_policy not in {'strict','warn_exploratory'}:
+            raise ValueError('Unknown endpoint_domain_policy.')
+        if s.endpoint_domain_policy == 'warn_exploratory':
+            if (s.tracking_method != 'guarded_translation_v1' or o.method != 'monotone_powell'
+                    or o.max_function_evaluations_per_grid>6 or o.max_grid_refinements!=0
+                    or self.execution.max_seconds is None or self.execution.max_seconds>2700
+                    or self.execution.max_solves is None or self.execution.max_solves>120):
+                raise ValueError('warn_exploratory requires guarded monotone Powell, <=6 evaluations, no optimization refinements, <=120 solves and <=2700 seconds.')
         if isinstance(s.tracking_recovery_depth,bool) or not isinstance(s.tracking_recovery_depth,int) or not 0<=s.tracking_recovery_depth<=5:
             raise ValueError('tracking_recovery_depth must be an integer from 0 to 5.')
         if e.method not in {"adaptive_1d", "python_grid", "python_pso"}:

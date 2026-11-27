@@ -1,0 +1,553 @@
+{
+  "fde_solve_counts": {
+    "completed": 46,
+    "failed": 0,
+    "started": 46
+  },
+  "fixed_output_extraction": [
+    {
+      "coupled_splitting_rad_per_m": {
+        "imag": -8.145387273851184e-10,
+        "real": 52520.178181620315
+      },
+      "extraction_flag": "negative_kappa_squared",
+      "isolated_detuning_rad_per_m": {
+        "imag": -8.559594391936055e-10,
+        "real": 52554.20226783492
+      },
+      "kappa": {
+        "imag": 945.3914241411314,
+        "real": 5.829718638365583e-10
+      },
+      "kappa_squared": {
+        "imag": 1.1022732011733073e-06,
+        "real": -893764.9448395967
+      },
+      "setting": "baseline",
+      "splitting_minus_detuning_rad_per_m": {
+        "imag": 4.142071180848711e-11,
+        "real": -34.024086214601994
+      },
+      "wavelength_m": 1.26e-06
+    },
+    {
+      "coupled_splitting_rad_per_m": {
+        "imag": -3.681750283776624e-08,
+        "real": 56936.9445708897
+      },
+      "extraction_flag": "negative_kappa_squared",
+      "isolated_detuning_rad_per_m": {
+        "imag": -3.6706369575112044e-08,
+        "real": 57019.906395380385
+      },
+      "kappa": {
+        "imag": -1537.3734313249436,
+        "real": 5.33761179695094e-10
+      },
+      "kappa_squared": {
+        "imag": -1.641180512671793e-06,
+        "real": -2363517.067343831
+      },
+      "setting": "baseline",
+      "splitting_minus_detuning_rad_per_m": {
+        "imag": -1.111332626541962e-10,
+        "real": -82.96182449068874
+      },
+      "wavelength_m": 1.34e-06
+    },
+    {
+      "coupled_splitting_rad_per_m": {
+        "imag": -1.2315064591703702e-08,
+        "real": 52478.70263041742
+      },
+      "extraction_flag": "negative_kappa_squared",
+      "isolated_detuning_rad_per_m": {
+        "imag": -1.2295556304906285e-08,
+        "real": 52512.09798214771
+      },
+      "kappa": {
+        "imag": 936.2431194541526,
+        "real": -1.6372754613837026e-10
+      },
+      "kappa_squared": {
+        "imag": -3.0657757707432294e-07,
+        "real": -876551.1787252426
+      },
+      "setting": "mesh_1p25",
+      "splitting_minus_detuning_rad_per_m": {
+        "imag": -1.9508286797416507e-11,
+        "real": -33.395351730287075
+      },
+      "wavelength_m": 1.26e-06
+    },
+    {
+      "coupled_splitting_rad_per_m": {
+        "imag": -2.2589442038700076e-07,
+        "real": 56508.769361956045
+      },
+      "extraction_flag": "negative_kappa_squared",
+      "isolated_detuning_rad_per_m": {
+        "imag": -2.260766531782692e-07,
+        "real": 56590.19102990907
+      },
+      "kappa": {
+        "imag": -1517.2924898366211,
+        "real": -4.729689422320368e-09
+      },
+      "kappa_squared": {
+        "imag": 1.4352644479492804e-05,
+        "real": -2302176.499714613
+      },
+      "setting": "mesh_1p25",
+      "splitting_minus_detuning_rad_per_m": {
+        "imag": 1.8223279126844292e-10,
+        "real": -81.42166795302182
+      },
+      "wavelength_m": 1.34e-06
+    },
+    {
+      "coupled_splitting_rad_per_m": {
+        "imag": -2.4716277487066464e-08,
+        "real": 52466.753397198394
+      },
+      "extraction_flag": "negative_kappa_squared",
+      "isolated_detuning_rad_per_m": {
+        "imag": -2.481874340891432e-08,
+        "real": 52499.600625382736
+      },
+      "kappa": {
+        "imag": 928.4198649126959,
+        "real": 1.6671555120677e-09
+      },
+      "kappa_squared": {
+        "imag": 3.0956405906047008e-06,
+        "real": -861963.4455645084
+      },
+      "setting": "mesh_1p5",
+      "splitting_minus_detuning_rad_per_m": {
+        "imag": 1.0246592184785612e-10,
+        "real": -32.847228184342384
+      },
+      "wavelength_m": 1.26e-06
+    },
+    {
+      "coupled_splitting_rad_per_m": {
+        "imag": -3.125406790054764e-07,
+        "real": 56645.3094899673
+      },
+      "extraction_flag": "negative_kappa_squared",
+      "isolated_detuning_rad_per_m": {
+        "imag": -3.126410286163013e-07,
+        "real": 56725.597863083705
+      },
+      "kappa": {
+        "imag": -1508.506356475448,
+        "real": -5.1020292667751055e-09
+      },
+      "kappa_squared": {
+        "imag": 1.5392887159708032e-05,
+        "real": -2275591.4275268316
+      },
+      "setting": "mesh_1p5",
+      "splitting_minus_detuning_rad_per_m": {
+        "imag": 1.0034961082489562e-10,
+        "real": -80.28837311640382
+      },
+      "wavelength_m": 1.34e-06
+    },
+    {
+      "coupled_splitting_rad_per_m": {
+        "imag": -8.406700475706546e-10,
+        "real": 52520.17818172835
+      },
+      "extraction_flag": "negative_kappa_squared",
+      "isolated_detuning_rad_per_m": {
+        "imag": -7.799319721951225e-10,
+        "real": 52554.202267939225
+      },
+      "kappa": {
+        "imag": 945.3914240903151,
+        "real": -8.36541877752267e-10
+      },
+      "kappa_squared": {
+        "imag": -1.5817190342388038e-06,
+        "real": -893764.9447435141
+      },
+      "setting": "x_domain_1p25",
+      "splitting_minus_detuning_rad_per_m": {
+        "imag": -6.073807537553208e-11,
+        "real": -34.0240862108767
+      },
+      "wavelength_m": 1.26e-06
+    },
+    {
+      "coupled_splitting_rad_per_m": {
+        "imag": -3.656772925805608e-08,
+        "real": 56936.94457207061
+      },
+      "extraction_flag": "negative_kappa_squared",
+      "isolated_detuning_rad_per_m": {
+        "imag": -3.667798535103271e-08,
+        "real": 57019.9063965464
+      },
+      "kappa": {
+        "imag": -1537.373431202739,
+        "real": -1.5156560937295771e-09
+      },
+      "kappa_squared": {
+        "imag": 4.660258818680761e-06,
+        "real": -2363517.0669680834
+      },
+      "setting": "x_domain_1p25",
+      "splitting_minus_detuning_rad_per_m": {
+        "imag": 1.1025609297663068e-10,
+        "real": -82.96182447578758
+      },
+      "wavelength_m": 1.34e-06
+    },
+    {
+      "coupled_splitting_rad_per_m": {
+        "imag": -7.38620280110934e-10,
+        "real": 52520.1781817209
+      },
+      "extraction_flag": "negative_kappa_squared",
+      "isolated_detuning_rad_per_m": {
+        "imag": -7.413590312078742e-10,
+        "real": 52554.20226794854
+      },
+      "kappa": {
+        "imag": 945.3914243232128,
+        "real": 4.470734419110182e-11
+      },
+      "kappa_squared": {
+        "imag": 8.453187960506773e-08,
+        "real": -893764.9451838732
+      },
+      "setting": "x_domain_1p5",
+      "splitting_minus_detuning_rad_per_m": {
+        "imag": 2.7387510969401826e-12,
+        "real": -34.02408622764051
+      },
+      "wavelength_m": 1.26e-06
+    },
+    {
+      "coupled_splitting_rad_per_m": {
+        "imag": -3.6537382742088186e-08,
+        "real": 56936.94457206875
+      },
+      "extraction_flag": "negative_kappa_squared",
+      "isolated_detuning_rad_per_m": {
+        "imag": -3.6589729530546394e-08,
+        "real": 57019.906396541744
+      },
+      "kappa": {
+        "imag": -1537.373431176763,
+        "real": -9.782946663767329e-10
+      },
+      "kappa_squared": {
+        "imag": 3.008008455899049e-06,
+        "real": -2363517.066888213
+      },
+      "setting": "x_domain_1p5",
+      "splitting_minus_detuning_rad_per_m": {
+        "imag": 5.234678845820741e-11,
+        "real": -82.96182447299361
+      },
+      "wavelength_m": 1.34e-06
+    }
+  ],
+  "flagged_extractions": 10,
+  "fresh_fde_solves": 46,
+  "full_execution_elapsed_seconds": 2241.422,
+  "interpretation": [
+    "Every fixed-output section has negative kappa squared with matched fundamental modes.",
+    "Lateral-domain expansion at fixed nominal mesh spacing leaves the coefficients essentially unchanged.",
+    "The tested mesh refinements fail configured numerical error limits; whole-profile convergence is not established.",
+    "The isolated-guide detuning exceeds the coupled-supermode splitting at the outputs, so the existing algebra returns imaginary coupling.",
+    "A coefficient-reference/model consistency investigation and numerical convergence are needed before a longer optimization."
+  ],
+  "longer_optimization_started": false,
+  "metric_only_comparisons": [
+    {
+      "axis": "mesh",
+      "comparison": "against_production_baseline",
+      "numerical_tolerances_passed_without_extraction_flags": false,
+      "setting": "mesh_1p25",
+      "wavelength_m": 1.26e-06,
+      "z_m": 0.0015
+    },
+    {
+      "axis": "mesh",
+      "comparison": "against_previous_setting",
+      "numerical_tolerances_passed_without_extraction_flags": false,
+      "setting": "mesh_1p25",
+      "wavelength_m": 1.26e-06,
+      "z_m": 0.0015
+    },
+    {
+      "axis": "mesh",
+      "comparison": "against_production_baseline",
+      "numerical_tolerances_passed_without_extraction_flags": false,
+      "setting": "mesh_1p25",
+      "wavelength_m": 1.26e-06,
+      "z_m": 0.00075
+    },
+    {
+      "axis": "mesh",
+      "comparison": "against_previous_setting",
+      "numerical_tolerances_passed_without_extraction_flags": false,
+      "setting": "mesh_1p25",
+      "wavelength_m": 1.26e-06,
+      "z_m": 0.00075
+    },
+    {
+      "axis": "mesh",
+      "comparison": "against_production_baseline",
+      "numerical_tolerances_passed_without_extraction_flags": false,
+      "setting": "mesh_1p25",
+      "wavelength_m": 1.34e-06,
+      "z_m": 0.0015
+    },
+    {
+      "axis": "mesh",
+      "comparison": "against_previous_setting",
+      "numerical_tolerances_passed_without_extraction_flags": false,
+      "setting": "mesh_1p25",
+      "wavelength_m": 1.34e-06,
+      "z_m": 0.0015
+    },
+    {
+      "axis": "mesh",
+      "comparison": "against_production_baseline",
+      "numerical_tolerances_passed_without_extraction_flags": false,
+      "setting": "mesh_1p25",
+      "wavelength_m": 1.34e-06,
+      "z_m": 0.00075
+    },
+    {
+      "axis": "mesh",
+      "comparison": "against_previous_setting",
+      "numerical_tolerances_passed_without_extraction_flags": false,
+      "setting": "mesh_1p25",
+      "wavelength_m": 1.34e-06,
+      "z_m": 0.00075
+    },
+    {
+      "axis": "mesh",
+      "comparison": "against_production_baseline",
+      "numerical_tolerances_passed_without_extraction_flags": false,
+      "setting": "mesh_1p5",
+      "wavelength_m": 1.26e-06,
+      "z_m": 0.0015
+    },
+    {
+      "axis": "mesh",
+      "comparison": "against_previous_setting",
+      "numerical_tolerances_passed_without_extraction_flags": false,
+      "setting": "mesh_1p5",
+      "wavelength_m": 1.26e-06,
+      "z_m": 0.0015
+    },
+    {
+      "axis": "mesh",
+      "comparison": "against_production_baseline",
+      "numerical_tolerances_passed_without_extraction_flags": false,
+      "setting": "mesh_1p5",
+      "wavelength_m": 1.26e-06,
+      "z_m": 0.00075
+    },
+    {
+      "axis": "mesh",
+      "comparison": "against_previous_setting",
+      "numerical_tolerances_passed_without_extraction_flags": false,
+      "setting": "mesh_1p5",
+      "wavelength_m": 1.26e-06,
+      "z_m": 0.00075
+    },
+    {
+      "axis": "mesh",
+      "comparison": "against_production_baseline",
+      "numerical_tolerances_passed_without_extraction_flags": false,
+      "setting": "mesh_1p5",
+      "wavelength_m": 1.34e-06,
+      "z_m": 0.0015
+    },
+    {
+      "axis": "mesh",
+      "comparison": "against_previous_setting",
+      "numerical_tolerances_passed_without_extraction_flags": false,
+      "setting": "mesh_1p5",
+      "wavelength_m": 1.34e-06,
+      "z_m": 0.0015
+    },
+    {
+      "axis": "mesh",
+      "comparison": "against_production_baseline",
+      "numerical_tolerances_passed_without_extraction_flags": false,
+      "setting": "mesh_1p5",
+      "wavelength_m": 1.34e-06,
+      "z_m": 0.00075
+    },
+    {
+      "axis": "mesh",
+      "comparison": "against_previous_setting",
+      "numerical_tolerances_passed_without_extraction_flags": false,
+      "setting": "mesh_1p5",
+      "wavelength_m": 1.34e-06,
+      "z_m": 0.00075
+    },
+    {
+      "axis": "x_domain",
+      "comparison": "against_production_baseline",
+      "numerical_tolerances_passed_without_extraction_flags": true,
+      "setting": "x_domain_1p25",
+      "wavelength_m": 1.26e-06,
+      "z_m": 0.0015
+    },
+    {
+      "axis": "x_domain",
+      "comparison": "against_previous_setting",
+      "numerical_tolerances_passed_without_extraction_flags": true,
+      "setting": "x_domain_1p25",
+      "wavelength_m": 1.26e-06,
+      "z_m": 0.0015
+    },
+    {
+      "axis": "x_domain",
+      "comparison": "against_production_baseline",
+      "numerical_tolerances_passed_without_extraction_flags": true,
+      "setting": "x_domain_1p25",
+      "wavelength_m": 1.26e-06,
+      "z_m": 0.00075
+    },
+    {
+      "axis": "x_domain",
+      "comparison": "against_previous_setting",
+      "numerical_tolerances_passed_without_extraction_flags": true,
+      "setting": "x_domain_1p25",
+      "wavelength_m": 1.26e-06,
+      "z_m": 0.00075
+    },
+    {
+      "axis": "x_domain",
+      "comparison": "against_production_baseline",
+      "numerical_tolerances_passed_without_extraction_flags": true,
+      "setting": "x_domain_1p25",
+      "wavelength_m": 1.34e-06,
+      "z_m": 0.0015
+    },
+    {
+      "axis": "x_domain",
+      "comparison": "against_previous_setting",
+      "numerical_tolerances_passed_without_extraction_flags": true,
+      "setting": "x_domain_1p25",
+      "wavelength_m": 1.34e-06,
+      "z_m": 0.0015
+    },
+    {
+      "axis": "x_domain",
+      "comparison": "against_production_baseline",
+      "numerical_tolerances_passed_without_extraction_flags": true,
+      "setting": "x_domain_1p25",
+      "wavelength_m": 1.34e-06,
+      "z_m": 0.00075
+    },
+    {
+      "axis": "x_domain",
+      "comparison": "against_previous_setting",
+      "numerical_tolerances_passed_without_extraction_flags": true,
+      "setting": "x_domain_1p25",
+      "wavelength_m": 1.34e-06,
+      "z_m": 0.00075
+    },
+    {
+      "axis": "x_domain",
+      "comparison": "against_production_baseline",
+      "numerical_tolerances_passed_without_extraction_flags": true,
+      "setting": "x_domain_1p5",
+      "wavelength_m": 1.26e-06,
+      "z_m": 0.0015
+    },
+    {
+      "axis": "x_domain",
+      "comparison": "against_previous_setting",
+      "numerical_tolerances_passed_without_extraction_flags": true,
+      "setting": "x_domain_1p5",
+      "wavelength_m": 1.26e-06,
+      "z_m": 0.0015
+    },
+    {
+      "axis": "x_domain",
+      "comparison": "against_production_baseline",
+      "numerical_tolerances_passed_without_extraction_flags": true,
+      "setting": "x_domain_1p5",
+      "wavelength_m": 1.26e-06,
+      "z_m": 0.00075
+    },
+    {
+      "axis": "x_domain",
+      "comparison": "against_previous_setting",
+      "numerical_tolerances_passed_without_extraction_flags": true,
+      "setting": "x_domain_1p5",
+      "wavelength_m": 1.26e-06,
+      "z_m": 0.00075
+    },
+    {
+      "axis": "x_domain",
+      "comparison": "against_production_baseline",
+      "numerical_tolerances_passed_without_extraction_flags": true,
+      "setting": "x_domain_1p5",
+      "wavelength_m": 1.34e-06,
+      "z_m": 0.0015
+    },
+    {
+      "axis": "x_domain",
+      "comparison": "against_previous_setting",
+      "numerical_tolerances_passed_without_extraction_flags": true,
+      "setting": "x_domain_1p5",
+      "wavelength_m": 1.34e-06,
+      "z_m": 0.0015
+    },
+    {
+      "axis": "x_domain",
+      "comparison": "against_production_baseline",
+      "numerical_tolerances_passed_without_extraction_flags": true,
+      "setting": "x_domain_1p5",
+      "wavelength_m": 1.34e-06,
+      "z_m": 0.00075
+    },
+    {
+      "axis": "x_domain",
+      "comparison": "against_previous_setting",
+      "numerical_tolerances_passed_without_extraction_flags": true,
+      "setting": "x_domain_1p5",
+      "wavelength_m": 1.34e-06,
+      "z_m": 0.00075
+    }
+  ],
+  "minimum_cross_setting_field_identity_overlap": 0.9998097322914887,
+  "numerical_error_summary": {
+    "mesh": {
+      "all_numerical_tolerance_comparisons_passed": false,
+      "delta_beta_error_rad_per_m": 500.6933898879215,
+      "kappa_error_rad_per_m": 52.42552204669846,
+      "maximum_loss_error_db": 5.437090837436589e-09,
+      "maximum_real_neff_error": 0.0010172045289376954
+    },
+    "x_domain": {
+      "all_numerical_tolerance_comparisons_passed": true,
+      "delta_beta_error_rad_per_m": 1.1660158637640565e-06,
+      "kappa_error_rad_per_m": 1.8208220332946977e-07,
+      "maximum_loss_error_db": 2.496697797706108e-12,
+      "maximum_real_neff_error": 2.542348191060302e-13
+    }
+  },
+  "optimized_device_published": false,
+  "physical_device_validation": false,
+  "pilot_midpoint_validation": "not_reached",
+  "sentinel_setting_combinations": 20,
+  "source_report": "coefficient_stability.json",
+  "source_report_sha256": "ef9e9d2ea6367b79ab4072d35ce83453086dc8558b8ea9dfb463d9f80918349b",
+  "study_execution_completed": true,
+  "valid_extractions": 10
+}

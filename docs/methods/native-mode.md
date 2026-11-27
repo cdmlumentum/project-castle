@@ -131,6 +131,12 @@ For the named guarded-tracking / monotone-Powell alternative, use
 bounded recovery, candidate rejection and short-pilot requirements. These
 settings are not supported by the standalone coordinate-pattern bundle.
 
+For a capped exploratory pilot, `tools/prepare_tracking_pilot.py` now sets the
+explicit `warn_exploratory` endpoint domain policy. Mode identity, detuning signs
+and coefficient extraction still must pass. Strict mode remains the default.
+See [v0.26.3](../changes/v26_3.md) for its budget restrictions and the independent
+`tools/check_block2_coefficient_stability.py` mesh/domain sensitivity check.
+
 The endpoint-field diagnostic runs only selected 1260 nm isolated cross-sections:
 
 ```powershell

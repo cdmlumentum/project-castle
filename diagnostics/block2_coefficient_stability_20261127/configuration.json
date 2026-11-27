@@ -1,0 +1,193 @@
+{
+  "characterization": {
+    "enabled": false,
+    "max_refinements": 4
+  },
+  "convergence": {
+    "candidate_margin_factors": [
+      1.0,
+      0.75,
+      0.5
+    ],
+    "candidate_mesh_factors": [
+      1.0,
+      1.25,
+      1.5
+    ],
+    "coefficient_atol_rad_per_m": 2.0,
+    "coefficient_rtol": 0.01,
+    "comparison_dx_m": 6e-08,
+    "comparison_dy_m": 3e-08,
+    "local_mesh_padding_m": 4e-07,
+    "loss_error_db": 0.01,
+    "max_seconds": 21600,
+    "max_solves": 1200,
+    "minimum_power_overlap": 0.999,
+    "neff_atol": 2e-05,
+    "phase_error_rad": 0.02,
+    "pml_layers": 12,
+    "pml_test_extra_layers": 4,
+    "polarization_atol": 0.01,
+    "reference_domain_factors": [
+      1.0,
+      1.25,
+      1.5,
+      1.75
+    ],
+    "reference_mesh_factors": [
+      1.0,
+      0.75,
+      0.5,
+      0.375
+    ],
+    "reference_sentinels": 4,
+    "timing_repeats": 2
+  },
+  "device": {
+    "grid_convergence_rtol": 0.01,
+    "length_m": 0.0015,
+    "wavelength_max_m": 1.34e-06,
+    "wavelength_min_m": 1.26e-06,
+    "wavelength_samples_initial": 5,
+    "wavelength_samples_max": 33,
+    "z_samples_initial": 5,
+    "z_samples_max": 33
+  },
+  "endpoint_search": {
+    "adaptive_initial_widths": 9,
+    "adaptive_max_widths": 33,
+    "adaptive_objective_rtol": 0.01,
+    "adaptive_width_tolerance_m": 5e-09,
+    "cross_magnitude_balance_rtol": 0.1,
+    "method": "adaptive_1d",
+    "pso_cognitive": 1.49618,
+    "pso_generation_size": 8,
+    "pso_guided_neff_margin": 1e-05,
+    "pso_inertia": 0.7298,
+    "pso_lower_mode_state_independent": true,
+    "pso_max_generations": 15,
+    "pso_random_seed": 20261120,
+    "pso_social": 1.49618,
+    "pso_tolerance": 0.0,
+    "pso_velocity_limit": 0.2
+  },
+  "execution": {
+    "max_seconds": 2700,
+    "max_solves": 60,
+    "native_batch_size": 1,
+    "resume": false,
+    "reuse_verification": true
+  },
+  "geometry": {
+    "box_thickness_m": 3e-06,
+    "d_c2c_bounds_m": [
+      -8e-06,
+      8e-06
+    ],
+    "d_c2c_input_m": -8e-06,
+    "d_c2c_output_m": 8e-06,
+    "domain_margin_top_m": 3e-06,
+    "domain_margin_x_m": 4e-06,
+    "h_gap_bounds_m": [
+      1e-06,
+      1e-06
+    ],
+    "h_gap_candidates_m": [
+      1e-06
+    ],
+    "h_rib_bounds_m": [
+      1.75e-07,
+      1.75e-07
+    ],
+    "h_rib_candidates_m": [
+      1.75e-07
+    ],
+    "h_wg_m": 3.5e-07,
+    "upper_and_lower_use_same_h_rib": true,
+    "w1_endpoint_candidates_m": [
+      3e-07,
+      1.15e-06,
+      2e-06
+    ],
+    "w1_lower_m": 2e-06,
+    "w1_max_m": 2e-06,
+    "w1_min_m": 3e-07
+  },
+  "materials": {
+    "liquid_bar_n": 1.37,
+    "liquid_cross_n": 1.55,
+    "liquid_dispersion_csv": null,
+    "material_fit_max_coefficients": 10,
+    "silica_model": "Malitson 1965 fused silica Sellmeier",
+    "silicon_data_csv": "C:\\Users\\mos68521\\OneDrive - Lumentum Operations LLC\\Documents\\ChatGPT\\project-castle\\outputs\\block2_checkout\\data\\green_si_2008_1260_1340.csv",
+    "silicon_model": "Green 2008 intrinsic Si, 300 K, tabulated",
+    "sin_absolute_index_offset": 0.0,
+    "sin_extinction_csv": null,
+    "sin_index_sensitivity_offsets": [],
+    "sin_model": "Luke et al. 2015 provisional stoichiometric LPCVD Sellmeier",
+    "temperature_k": 300.0
+  },
+  "optimizer": {
+    "complete_within_seconds": 2700,
+    "control_points": 6,
+    "max_function_evaluations_per_grid": 6,
+    "max_grid_refinements": 0,
+    "maximum_curvature_per_m": null,
+    "maximum_slope_m_per_m": null,
+    "method": "monotone_powell",
+    "minimum_control_step_fraction": 0.005,
+    "random_seed": 20261120
+  },
+  "output": {
+    "cache_max_bytes": 2000000000,
+    "cache_sqlite": "C:\\Users\\mos68521\\OneDrive - Lumentum Operations LLC\\Documents\\ChatGPT\\project-castle\\outputs\\block2_guarded_pilot_20261127_run02\\cache\\native_fde_cache.sqlite",
+    "directory": "C:\\Users\\mos68521\\OneDrive - Lumentum Operations LLC\\Documents\\ChatGPT\\project-castle\\outputs\\block2_guarded_pilot_20261127_run02",
+    "save_solver_projects": false
+  },
+  "propagation": {
+    "power_convergence_rtol": 1e-06,
+    "rk4_steps_initial": 400,
+    "rk4_steps_max": 12800,
+    "xt_power_floor": 1e-15
+  },
+  "solver": {
+    "api_path": "C:/Program Files/Lumerical/v221/api/python",
+    "batch_mode_data": true,
+    "calibration": null,
+    "coefficient_convergence_relative_tolerance": 0.05,
+    "domain_convergence_neff_tolerance": 2e-05,
+    "domain_margin_y_bottom_m": 5e-07,
+    "domain_scale_factors": [
+      1.0,
+      1.25,
+      1.5
+    ],
+    "endpoint_compact_x": true,
+    "endpoint_domain_policy": "warn_exploratory",
+    "engine": "native",
+    "field_overlap_crosscheck_max_basis_overlap": 0.95,
+    "hide_gui": true,
+    "large_separation_check_m": 7e-06,
+    "mesh_accuracy": 3,
+    "mesh_accuracy_refinements": [
+      2,
+      3,
+      4
+    ],
+    "mesh_cells_x": 528,
+    "mesh_cells_y": 208,
+    "mesh_convergence_neff_tolerance": 2e-05,
+    "minimum_mode_overlap": 0.55,
+    "minimum_te_fraction": 0.45,
+    "number_of_trial_modes": 8,
+    "platform": "windows",
+    "raw_cache_memory_entries": 16,
+    "reuse_mode_project": true,
+    "threads": 2,
+    "tracking_grid_nx": 144,
+    "tracking_grid_ny": 72,
+    "tracking_method": "guarded_translation_v1",
+    "tracking_recovery_depth": 3,
+    "zero_mode_retries": 1
+  }
+}
