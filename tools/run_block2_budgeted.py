@@ -22,26 +22,44 @@ def main():
     parser.add_argument('--hours',type=float,default=8.)
     parser.add_argument('--max-solves',type=int,default=12000,
                         help='Block 2 solve cap, independent of the endpoint run budget.')
+    parser.add_argument('--config',type=Path,help='Explicit trial configuration; upstream compatibility is still checked.')
+    parser.add_argument('--cache-dir',type=Path,help='Reuse a compatible cache/checkpoint directory.')
+    parser.add_argument('--deadline-utc',help='Absolute timezone-aware deadline; cannot extend the --hours cap.')
     args = parser.parse_args()
     if not 0 < args.hours <= 8:
         parser.error('--hours must be positive and at most 8')
     if args.max_solves < 1:
         parser.error('--max-solves must be positive')
+    started = time.monotonic()
+    started_utc = datetime.now(timezone.utc)
+    deadline = started_utc+timedelta(hours=args.hours)
+    if args.deadline_utc:
+        try:
+            requested = datetime.fromisoformat(args.deadline_utc)
+            if requested.tzinfo is None:
+                raise ValueError('A timezone is required')
+            deadline = min(deadline,requested.astimezone(timezone.utc))
+        except ValueError:
+            parser.error('--deadline-utc must be a timezone-aware ISO timestamp')
+    seconds = (deadline-started_utc).total_seconds()
+    if seconds <= 0:
+        parser.error('The trial deadline has already passed')
     endpoint = Path(args.endpoint_dir).resolve()
     out = Path(args.out).resolve()
     out.mkdir(parents=True,exist_ok=True)
     record_path = out/'execution.json'
     if record_path.exists():
         raise RuntimeError('Use a new output directory; execution records are immutable run identities.')
-    raw = json.loads((endpoint/'configuration.json').read_text(encoding='utf-8'))
+    supplied_config = args.config.resolve() if args.config else endpoint/'configuration.json'
+    raw = json.loads(supplied_config.read_text(encoding='utf-8'))
     raw['project_root'] = str(ROOT)
     # The only supplied silicon table is reference data; preserve its bytes.
     raw['materials']['silicon_data_csv'] = str(ROOT/'data/green_si_2008_1260_1340.csv')
     for key in ('sin_extinction_csv','liquid_dispersion_csv'):
         if raw['materials'].get(key) and not Path(raw['materials'][key]).is_absolute():
             raise ValueError('Resolve material file paths in the endpoint configuration before supervision.')
-    raw['output'].update(directory=str(out),cache_sqlite=str(out/'cache/native_fde_cache.sqlite'))
-    seconds = args.hours*3600.
+    cache_dir = args.cache_dir.resolve() if args.cache_dir else out/'cache'
+    raw['output'].update(directory=str(out),cache_sqlite=str(cache_dir/'native_fde_cache.sqlite'))
     # Leave another half hour outside the internal completion plan for startup,
     # unexpected timing variation, final file publication and MODE cleanup.
     plan_seconds = max(seconds*.75,seconds-1800.)
@@ -58,14 +76,14 @@ def main():
     env = dict(os.environ,PYTHONUNBUFFERED='1',PYTHONDONTWRITEBYTECODE='1',MPLBACKEND='Agg')
     for key in ('VLAC_CACHE_DIR','VLAC_HIDE_GUI','VLAC_PLATFORM','LUMERICAL_PYTHON_API'):
         env.pop(key,None)
-    started = time.monotonic()
-    started_utc = datetime.now(timezone.utc)
     record = {'status':'starting','started_utc':started_utc.isoformat(),
-        'deadline_utc':(started_utc+timedelta(seconds=seconds)).isoformat(),
+        'deadline_utc':deadline.isoformat(),'supplied_config':str(supplied_config),
         'source_checkout':str(ROOT),'source_commit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),
         'command':command,'maximum_wall_seconds':seconds,'completion_plan_seconds':plan_seconds,
         'maximum_fde_solves':args.max_solves,
-        'numerical_changes':'Measured-cost profile work allocation only; endpoint geometry, mesh and tolerances preserved.',
+        'domain_convergence_neff_tolerance':config.solver.domain_convergence_neff_tolerance,
+        'numerical_changes':('Explicit trial configuration; endpoint compatibility checked; numerical and acceptance settings are recorded in run_configuration.json.' if args.config else
+                             'Measured-cost profile work allocation only; endpoint geometry, mesh and tolerances preserved.'),
         'block0_certificate_applied':bool(config.solver.calibration),'supervisor_pid':os.getpid()}
     write_json(record_path,record)
     if os.name == 'nt':
