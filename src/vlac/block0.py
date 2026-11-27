@@ -29,8 +29,13 @@ from .geometry import ClampedCubicProfile, make_geometry
 from .materials import build_material_bank
 
 SCHEMA = 1
-METHOD = 'mode_domain_mesh_calibration_v1'
+METHOD = 'mode_domain_mesh_calibration_v2_fixed_lattice'
 KINDS = ('isolated', 'coupled')
+
+
+def _ceil_cells(value):
+    """Ceil a cell count without adding a cell for floating-point roundoff."""
+    return max(2, math.ceil(value-1e-12*max(1., abs(value))))
 
 
 from .runtime import BudgetExceeded
@@ -104,11 +109,11 @@ class SolverProfile:
 
     @property
     def nx(self):
-        return max(2, math.ceil(self.x_span_m / self.dx_m))
+        return _ceil_cells(self.x_span_m / self.dx_m)
 
     @property
     def ny(self):
-        return max(2, math.ceil((self.y_max_m-self.y_min_m) / self.dy_m))
+        return _ceil_cells((self.y_max_m-self.y_min_m) / self.dy_m)
 
     def native(self):
         return {**asdict(self), 'mesh_cells_x': float(self.nx), 'mesh_cells_y': float(self.ny)}
@@ -150,6 +155,25 @@ def comparison_grid(config, profile, kind):
     ny = max(17, 2*math.ceil((largest.y_max_m-largest.y_min_m)/c.comparison_dy_m/2)+1)
     return dict(tracking_x_span_m=largest.x_span_m, tracking_y_min_m=largest.y_min_m,
                 tracking_y_max_m=largest.y_max_m, tracking_nx=nx, tracking_ny=ny)
+
+
+def domain_reference_profile(config, anchor, kind, axis, factor):
+    """Expand padding on the existing uniform lattice, keeping material sampling fixed."""
+    target = margins(config, anchor, kind, factor)
+    dx = anchor.x_span_m/anchor.nx
+    dy = (anchor.y_max_m-anchor.y_min_m)/anchor.ny
+    if axis == 'domain_x':
+        cells = _ceil_cells(target.x_span_m/dx)
+        # With a centered domain, equal parity preserves the x=0 registration.
+        cells += (cells-anchor.nx) % 2
+        return replace(anchor, x_span_m=cells*dx, dx_m=dx)
+    if axis == 'domain_top':
+        cells = max(0, math.ceil((target.y_max_m-anchor.y_max_m)/dy-1e-10))
+        return replace(anchor, y_max_m=anchor.y_max_m+cells*dy, dy_m=dy)
+    if axis == 'domain_bottom':
+        cells = max(0, math.ceil((anchor.y_min_m-target.y_min_m)/dy-1e-10))
+        return replace(anchor, y_min_m=anchor.y_min_m-cells*dy, dy_m=dy)
+    raise ValueError('Unknown reference domain axis: '+axis)
 
 
 def test_cases(config, *, trial=False):
@@ -322,12 +346,20 @@ class NativeEvaluator:
         if getattr(self, '_scene_signature', None) != signature:
             session.eval('newproject;')
             self._scene_signature = signature
-        self.backend._budget().check((2 if kind=='isolated' else 3)*(1+self.config.solver.zero_mode_retries))
+        reserved = (2 if kind=='isolated' else 3)*(1+self.config.solver.zero_mode_retries)
+        self.backend._budget().check(reserved)
         session.putv('vlac_cfg', cfg)
         session.putv('vlac_request', {'geometry': asdict(geometry), 'wavelength_m': case['wavelength_m'], 'kind': kind})
         started = time.perf_counter()
-        session.eval('vlac_sample=vlac_convergence_sample(vlac_cfg,vlac_request);')
-        value = session.getv('vlac_sample')
+        try:
+            session.eval('vlac_sample_error=""; try { vlac_sample=vlac_convergence_sample(vlac_cfg,vlac_request); } catch(vlac_sample_error);')
+            error = session.getv('vlac_sample_error')
+            if error:
+                raise RuntimeError('Block 0 native script error: '+str(error))
+            value = session.getv('vlac_sample')
+        except BaseException:
+            self.backend._budget().consume(reserved)
+            raise
         elapsed = time.perf_counter()-started
         self.backend._budget().consume(int(scalar(value.get('solves', 0))))
         if not bool(scalar(value['ok'])):
@@ -456,7 +488,8 @@ class CalibrationRun:
                            'domain_bottom': {'y_min_m': enlarged.y_min_m},
                            'mesh_x': {'dx_m': anchor.dx_m*factor},
                            'mesh_y': {'dy_m': anchor.dy_m*factor}}
-                profile = replace(anchor, **changes[axis])
+                profile = (domain_reference_profile(self.config, anchor, kind, axis, factor)
+                           if axis.startswith('domain_') else replace(anchor, **changes[axis]))
                 if previous is not None:
                     passed, _ = self.compare(kind, cases, previous, profile, 'reference_'+axis)
                     stable = stable+1 if passed else 0

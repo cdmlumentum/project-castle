@@ -36,13 +36,25 @@ function vlac_rectangle(name,material,xc,yc,xspan,yspan,enabled) {
     return 1;
 }
 
+function vlac_configure_pml(layers) {
+    set("pml layers",layers);
+    properties=get;
+    enabled=0;
+    if (findstring(properties,"autoscale pml parameters")!=-1) {
+        set("autoscale pml parameters",1); enabled=1;
+    }
+    return enabled;
+}
+
 function vlac_raw(cfg,geometry,wavelength,upper_enabled,lower_enabled,compact) {
     result=struct; result.ok=0; result.error="zero_modes";
     result.n=0; result.items=cell(1); result.attempts=0;
+    vlac_raw_error="";
+    try {
     xspan=cfg.x_span_m; nx=cfg.mesh_cells_x;
     if (compact) { xspan=cfg.compact_x_span_m; nx=cfg.compact_mesh_cells_x; }
     ymin=cfg.y_min_m; ymax=cfg.y_max_m; ny=cfg.mesh_cells_y;
-    calibrated=0;
+    calibrated=0; pml_autoscale_enabled=0;
     if (isfield(cfg,"full_profile")) {
         numerical=cfg.full_profile;
         if (compact) { numerical=cfg.compact_profile; }
@@ -102,7 +114,7 @@ function vlac_raw(cfg,geometry,wavelength,upper_enabled,lower_enabled,compact) {
         set("x min bc","PML"); set("x max bc","PML");
         set("y min bc","PML"); set("y max bc","PML");
         if (calibrated) {
-            set("pml layers",numerical.pml_layers); set("autoscale pml parameters",1);
+            pml_autoscale_enabled=vlac_configure_pml(numerical.pml_layers);
             if ((numerical.local_dx_m>0)|(numerical.local_dy_m>0)) {
                 for (guide_index=1:2) {
                     active=lower_enabled; center_x=0; center_y=geometry.h_wg_m/2; guide_width=geometry.w2_m;
@@ -142,6 +154,10 @@ function vlac_raw(cfg,geometry,wavelength,upper_enabled,lower_enabled,compact) {
                 if ((field_norm>0)&(field_norm<1e300)) {
                     snapshot=struct;
                     mesh_info=struct;
+                    mesh_info.pml_layers=getnamed("FDE","pml layers");
+                    mesh_info.pml_autoscale_enabled=pml_autoscale_enabled;
+                    mesh_info.actual_mesh_cells_x=getnamed("FDE","actual mesh cells x");
+                    mesh_info.actual_mesh_cells_y=getnamed("FDE","actual mesh cells y");
                     mesh_info.field_grid_intervals_x=length(x)-1; mesh_info.field_grid_intervals_y=length(y)-1;
                     mesh_info.minimum_dx_m=min(x(2:length(x))-x(1:(length(x)-1)));
                     mesh_info.maximum_dx_m=max(x(2:length(x))-x(1:(length(x)-1)));
@@ -172,6 +188,9 @@ function vlac_raw(cfg,geometry,wavelength,upper_enabled,lower_enabled,compact) {
             return result;
         }
     }
+    return result;
+    } catch(vlac_raw_error);
+    result.ok=0; result.error="vlac_raw: "+vlac_raw_error;
     return result;
 }
 

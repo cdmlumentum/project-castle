@@ -521,6 +521,10 @@ def _main(argv: list[str] | None = None) -> int:
     calibration = subparsers.add_parser('block0', help='calibrate MODE domains and meshes with bounded, restartable native FDE tests')
     calibration.add_argument('--config', default=str(DEFAULT_CONFIG))
     calibration.add_argument('--out', required=True)
+    calibration.add_argument('--method', choices=('full', 'reduced'), default='full',
+                             help='Full certification, or scoped nine-setting convergence with a 200-call lifetime cap.')
+    calibration.add_argument('--cases', help='Reduced method: JSON with four SI stress cases per family.')
+    calibration.add_argument('--plan-only', action='store_true', help='Print the reduced plan without launching MODE or writing outputs.')
     calibration.add_argument('--trial', action='store_true', help='Two-state diagnostic only; cannot issue production profiles.')
     calibration.add_argument('--resume', action='store_true')
     calibration.add_argument('--max-solves', type=int)
@@ -596,10 +600,23 @@ def _main(argv: list[str] | None = None) -> int:
             config = _apply_runtime_overrides(load_config(args.config), api_path=args.api_path,
                 hide_gui=args.hide_gui, platform=args.platform, block0_dir=args.block0_dir)
             updates = {k: v for k, v in (('max_solves', args.max_solves), ('max_seconds', args.max_seconds)) if v is not None}
+            if args.command == 'block0' and args.method == 'reduced' and args.max_seconds is None:
+                updates['max_seconds'] = min(config.convergence.max_seconds, 7200.)
             config = replace(config, convergence=replace(config.convergence, **updates))
             config.validate()
             if args.command == 'block0':
-                report = run_calibration(config, args.out, trial=args.trial, resume=args.resume)
+                if args.method == 'reduced':
+                    from .block0_reduced import prepare_plan, run_reduced
+                    if args.trial:
+                        raise ValueError('--trial and --method reduced are separate alternatives.')
+                    if args.plan_only:
+                        print(json.dumps(prepare_plan(config, args.cases), indent=2))
+                        return 0
+                    report = run_reduced(config, args.out, cases=args.cases, resume=args.resume)
+                else:
+                    if args.cases or args.plan_only:
+                        raise ValueError('--cases and --plan-only require --method reduced.')
+                    report = run_calibration(config, args.out, trial=args.trial, resume=args.resume)
             else:
                 report = verify_saved_design(config, args.out, endpoint_dir=args.endpoint_dir, profile_dir=args.profile_dir)
             print(f'Block 0 {report["status"]}: {Path(args.out).resolve()}')

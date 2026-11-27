@@ -8,7 +8,7 @@ The Python package supports a native Lumerical script calculation core and stand
 
 ## Execution choices
 
-For certified transverse domains and meshes, see [Block 0 convergence](block0-convergence.md). `native prepare --block0-dir ...` embeds its passed profiles and certificate ID. The new calibration/native profile settings have offline contract coverage; their licensed v221 trial is deferred pending user instruction.
+For certified transverse domains and meshes, see [Block 0 convergence](block0-convergence.md). `native prepare --block0-dir ...` embeds its passed profiles and certificate ID. Calibration/native profile settings have offline contract coverage; use a passed full certificate from the intended installed solver before production handoff.
 
 | Execution choice | Endpoint search | Profile optimization | FDE and coefficient processing |
 | --- | --- | --- | --- |

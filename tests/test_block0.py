@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import numpy as np
 from scipy.io import loadmat
@@ -80,6 +80,47 @@ def certificate_fixture(config):
 
 
 class BlockZeroTests(unittest.TestCase):
+    def test_domain_reference_keeps_the_uniform_mesh_lattice_fixed(self):
+        config = load_config(ROOT/'config/native.json')
+        for kind, anchor in b0.base_profiles(config).items():
+            dx = anchor.x_span_m/anchor.nx
+            dy = (anchor.y_max_m-anchor.y_min_m)/anchor.ny
+            for factor in config.convergence.reference_domain_factors:
+                with self.subTest(kind=kind, factor=factor):
+                    lateral = b0.domain_reference_profile(config, anchor, kind, 'domain_x', factor)
+                    target = b0.margins(config, anchor, kind, factor)
+                    self.assertEqual(lateral.nx % 2, anchor.nx % 2)
+                    self.assertAlmostEqual(lateral.x_span_m/lateral.nx/dx, 1., places=13)
+                    self.assertGreaterEqual(lateral.x_span_m+1e-18, target.x_span_m)
+                    self.assertLess(lateral.x_span_m-target.x_span_m, 2*dx+1e-18)
+                    for axis in ('domain_top', 'domain_bottom'):
+                        profile = b0.domain_reference_profile(config, anchor, kind, axis, factor)
+                        self.assertAlmostEqual((profile.y_max_m-profile.y_min_m)/profile.ny/dy, 1., places=13)
+                        self.assertAlmostEqual((profile.y_min_m-anchor.y_min_m)/dy,
+                                               round((profile.y_min_m-anchor.y_min_m)/dy), places=12)
+                        self.assertGreaterEqual(profile.y_max_m+1e-18, target.y_max_m if axis=='domain_top' else anchor.y_max_m)
+                        self.assertLessEqual(profile.y_min_m-1e-18, target.y_min_m if axis=='domain_bottom' else anchor.y_min_m)
+
+    def test_integer_cell_counts_do_not_gain_roundoff_cells(self):
+        profile = b0.SolverProfile(np.nextafter(204., np.inf), 0., np.nextafter(208., np.inf), 1., 1.)
+        self.assertEqual((profile.nx, profile.ny), (204, 208))
+        self.assertEqual(replace(profile, x_span_m=204.001).nx, 205)
+
+    def test_native_script_error_is_reported_and_failed_attempts_are_budgeted(self):
+        config = load_config(ROOT/'config/native.json')
+        backend = Mock()
+        backend.session.getv.return_value = 'unsupported mesh property at native line 103'
+        evaluator = b0.NativeEvaluator(config, backend=backend)
+        evaluator.functions_loaded = True
+        profile = b0.base_profiles(config)['isolated']
+        profile = replace(profile, **b0.comparison_grid(config, profile, 'isolated'))
+        case = b0.test_cases(config)['isolated'][0]
+        with self.assertRaisesRegex(RuntimeError, 'unsupported mesh property at native line 103'):
+            evaluator('isolated', case, profile)
+        backend._budget.return_value.check.assert_called_once_with(4)
+        backend._budget.return_value.consume.assert_called_once_with(4)
+        backend.session.getv.assert_called_once_with('vlac_sample_error')
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.out = Path(self.temp.name)

@@ -1,17 +1,21 @@
 # Block 0: MODE domain and mesh calibration
 
+For the separately scoped, nine-setting alternative with 180 planned calls and
+a 200-call lifetime cap, see [Reduced Block 0](block0-reduced.md). Select it with
+`block0 --method reduced`; it does not issue this full-envelope certificate.
+
 Block 0 selects the fastest **tested** transverse domain and mesh that meet explicit numerical error limits. It exports two fixed solver profiles and a certificate consumed by Blocks 1–3. It changes computational padding and resolution; physical ridge widths, slabs, gap, BOX constraints and materials remain device inputs.
 
 `src/vlac/block0.py` orchestrates the bounded search, checkpoints and reports. `src/vlac/native/vlac_convergence.lsf` calls the native MODE core for every optical sample. An isolated sample uses two FDE solves; a coupled sample uses three, plus configured zero-mode retries. No synthetic optical model is used in a licensed run.
 
 ## Validation status
 
-This revision has offline numerical and contract tests. The user deferred the licensed Block 0 trial until further instruction. No new domain, mesh, production speedup or real-device convergence is established. Earlier v24 reports are historical implementation-parity evidence for that revision.
+Offline numerical and contract tests cover the calibration logic and handoffs. Run licensed calibration on the intended installation before using a solver profile; a passed full certificate is required. Installation-specific simulation results remain in the selected local output directory. Earlier v24 reports are historical implementation-parity evidence for that revision.
 
 ## Algorithm
 
 1. Record input/source/MODE installation identities, case counts, budgets, hardware and first-sample timing.
-2. Expand lateral, top and bottom reference padding independently while preserving physical dx/dy. Require two consecutive passing comparisons for each axis.
+2. Expand lateral, top and bottom reference padding independently while preserving the actual uniform-grid spacing and registration relative to the material interfaces. Round lateral expansions outward to an equal-parity cell count and vertical expansions to whole cells. Require two consecutive passing comparisons for each axis.
 3. Refine horizontal and vertical meshes independently at fixed domain size. Require two consecutive passing comparisons for each, followed by combined mesh/domain and extra-PML-layer guards.
 4. Screen lateral/top/bottom padding and horizontal/vertical spacing independently; test combined reductions and coarse backgrounds with local ridge/interface mesh overrides.
 5. Cover minimum/middle/maximum widths, both liquid states, band edges plus center, and minimum/zero/maximum offsets, including rib/gap bounds if variable. Add interpolated phase-matching widths and midpoints where modal fields or TE fractions change substantially.
@@ -20,6 +24,12 @@ This revision has offline numerical and contract tests. The user deferred the li
 8. Publish profiles only for a completed, real, full calibration. Trial, exhausted-budget and synthetic runs cannot certify production settings.
 
 This is a bounded coordinate search with joint checks, not proof of a global minimum. If an added case invalidates the reference, revise the reference plan in a new run directory; geometry bounds and tolerances are never silently relaxed.
+
+Reference expansion establishes an accuracy target before searching downward. It does not select larger production boundaries. The configured isolated-domain candidates have lateral spans of 10, 8 and 6 micrometres; the search also reduces top/bottom padding and tests coarser spacing. A candidate must agree with the converged reference across the required envelope before it can replace the baseline. Agreement between two small, truncated domains is insufficient.
+
+The fixed-lattice reference procedure is named `mode_domain_mesh_calibration_v2_fixed_lattice`. It supersedes the v1 procedure, which could change the material sampling as the cell count rounded or changed parity. Earlier checkpoints/certificates must not be relabeled or migrated to v2.
+
+The native solver detects whether the installed FDE object exposes `autoscale pml parameters` before setting that optional property. MODE v221 exposes `pml layers` but lacks that autoscale property. Saved mesh evidence records the configured PML layers, whether autoscaling was enabled, actual base cell counts and field-grid spacing. PML field-grid intervals include additional cells and are reported separately from base mesh counts. Reference PML sensitivity checks remain required.
 
 ## Accuracy limits
 
@@ -58,22 +68,24 @@ Standalone bundles embed the profiles and certificate ID in MAT data and their m
 
 ## Commands
 
-These licensed commands were **not run during this implementation**.
+Examples below show full and diagnostic scopes. Invocation budgets bound runtime without changing accuracy requirements; a short allocation can finish with an incomplete checkpoint.
 
 ```powershell
 # Full calibration with explicit invocation budgets:
-python tools/run_vlac.py block0 --config config/native.json --out outputs/block0/run01 --max-solves 1200 --max-seconds 21600 --hide-gui
+python tools/run_vlac.py block0 --config config/native.json --out outputs/block0/run01 --max-solves 1200 --max-seconds 3300 --hide-gui
 
 # Diagnostic trial, when authorized:
 python tools/run_vlac.py block0 --config config/native.json --out outputs/block0/trial01 --trial --max-solves 36 --max-seconds 900 --hide-gui
 
 # Resume identical inputs with a fresh invocation budget:
-python tools/run_vlac.py block0 --config config/native.json --out outputs/block0/run01 --resume --max-solves 1200 --max-seconds 21600 --hide-gui
+python tools/run_vlac.py block0 --config config/native.json --out outputs/block0/run01 --resume --max-solves 1200 --max-seconds 3300 --hide-gui
 ```
 
 A trial compares baseline, finer mesh and expanded domains in both states at central geometry/wavelength. It always reports `incomplete` for production certification. `execution_completed` distinguishes a completed diagnostic from an interrupted one.
 
 Resume checks identities and compressed field-array checksums. Partially written samples are recalculated. Solve budgets reserve all configured retries; time limits are checked between samples and an active eigensolve can overrun the wall-time budget. Accuracy/search-plan changes require a new output directory.
+
+The six-hour default is an invocation ceiling, not a duration estimate or a requirement to spend that time. For a shorter allocation, supply `--max-seconds 3300` (55 minutes, leaving headroom for setup/finalization). An incomplete checkpoint may be resumed explicitly with another allocation. A shorter allocation does not reduce the accuracy requirements or the sampled envelope, and does not guarantee a complete certificate within that time. Coordinate the `execution` budget as well when it is lower than the requested convergence budget. No new production profile is published after budget exhaustion.
 
 ```powershell
 python tools/run_vlac.py block1 --config config/native.json --block0-dir outputs/block0/run01 --out outputs/calibrated/block1
@@ -96,4 +108,4 @@ Exit codes: **0** passed full calibration/design verification; **3** trial scope
 
 `python tools/run_tests.py test_block0` tests accuracy gates, trial labeling, budgets, checked resume, stale-certificate rejection and offline JSON/MAT/bundle handoffs with explicitly synthetic data. The full test suite checks previous block compatibility. Neither command launches MODE.
 
-Primary documentation: Ansys [convergence guidance](https://optics.ansys.com/hc/en-us/articles/360051107554-Tunable-CROW-Filter), [FDE mesh and PML settings](https://optics.ansys.com/hc/en-us/articles/360034916973-FDE-solver-Simulation-object), [mesh overrides](https://optics.ansys.com/hc/en-us/articles/360034924253-addmesh-Script-command), and [mode-finding pitfalls](https://optics.ansys.com/hc/en-us/articles/360034396914-Tips-for-finding-modes-in-FDE-and-the-mode-source). Installed v221 runtime functionality awaits the deferred trial. Numerical convergence is distinct from material accuracy, fabrication robustness and full-device EME/FDTD validation.
+Primary documentation: Ansys [convergence guidance](https://optics.ansys.com/hc/en-us/articles/360051107554-Tunable-CROW-Filter), [FDE mesh and PML settings](https://optics.ansys.com/hc/en-us/articles/360034916973-FDE-solver-Simulation-object), [mesh overrides](https://optics.ansys.com/hc/en-us/articles/360034924253-addmesh-Script-command), and [mode-finding pitfalls](https://optics.ansys.com/hc/en-us/articles/360034396914-Tips-for-finding-modes-in-FDE-and-the-mode-source). Validate the installed solver rather than assuming current documentation lists its exact properties. Numerical convergence is distinct from material accuracy, fabrication robustness and full-device EME/FDTD validation.
