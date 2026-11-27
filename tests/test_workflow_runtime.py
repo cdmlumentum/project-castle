@@ -49,6 +49,25 @@ class StorageTests(unittest.TestCase):
             checkpoint.path.write_bytes(checkpoint.path.read_bytes()+b'broken')
             with self.assertRaisesRegex(ValueError,'checksum'):checkpoint.load()
 
+    def test_checkpoint_saves_near_windows_path_limit(self):
+        with tempfile.TemporaryDirectory() as folder:
+            directory=Path(folder)/('d'*max(1,158-len(str(Path(folder)))-1))
+            checkpoint=Checkpoint(directory,'adaptive-widths','a'*64)
+            self.assertLess(len(str(checkpoint.path)),260)
+            self.assertGreater(len(str(checkpoint.path.with_suffix('.'+'a'*32+'.tmp'))),260)
+            checkpoint.save({'widths':np.array([.3e-6,2e-6])})
+            np.testing.assert_array_equal(checkpoint.load()['widths'],[.3e-6,2e-6])
+            self.assertEqual(list(directory.glob('*.tmp')),[])
+
+    def test_checkpoint_failed_replace_preserves_previous_and_cleans_temp(self):
+        with tempfile.TemporaryDirectory() as folder:
+            checkpoint=Checkpoint(folder,'optimizer','identity')
+            checkpoint.save({'completed':1})
+            with patch.object(Path,'replace',side_effect=PermissionError('SYNTHETIC locked checkpoint')):
+                with self.assertRaises(PermissionError):checkpoint.save({'completed':2})
+            self.assertEqual(checkpoint.load(),{'completed':1})
+            self.assertEqual(list(Path(folder).glob('*.tmp')),[])
+
     def test_failed_attempt_preserves_previous_published_files(self):
         with tempfile.TemporaryDirectory() as folder:
             with output_attempt(folder,'first') as attempt:(attempt/'result.txt').write_text('good')

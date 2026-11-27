@@ -51,6 +51,12 @@ The automatic limit is 2 GB of compressed payload, with least-recently-used evic
 
 Adaptive search saves its width table, mode references and lower-mode evidence after each completed width. Powell saves its best feasible controls and completed grid history; it resumes as a **warm restart**, not exact restoration of SciPy's directions/line search. Broadband refinement saves each completed grid. Checkpoint replacement is atomic and includes a checksum; corrupt checkpoints are rejected. Increase a solve/time budget and rerun to continue. Changing the numerical/physical identity starts a separate checkpoint.
 
+Checkpoint writes use a short unique temporary filename in the same directory,
+then atomically replace the identity-named checkpoint. This avoids extending an
+otherwise valid Windows path beyond its legacy length limit. Failed writes
+remove the temporary file and preserve the previous checkpoint. The checkpoint
+format, optical calculations and cache identities are unchanged.
+
 Block 0 design checks reuse checksummed independent selected/reference samples keyed by the certificate, design, coordinates, implementation and verification criteria. Block 3 can reuse Block 2's reference solves while checking its newly saved bar coefficients. Saved-coefficient comparisons are rerun; ordinary optimization-cache entries never substitute for independent verification. Set `execution.reuse_verification=false` for a separate fresh evidence directory.
 
 ## Frozen-profile characterization

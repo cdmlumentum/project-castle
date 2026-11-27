@@ -75,9 +75,19 @@ class Checkpoint:
 
     def save(self, value):
         from hashlib import sha256
-        import uuid
+        from pathlib import Path
+        from tempfile import NamedTemporaryFile
         self.path.parent.mkdir(parents=True, exist_ok=True)
         payload = encode(value)
-        temp = self.path.with_suffix('.'+uuid.uuid4().hex+'.tmp')
-        temp.write_bytes(sha256(payload).hexdigest().encode()+b'\n'+payload)
-        temp.replace(self.path)
+        temp = None
+        try:
+            # A short, unique sibling keeps atomic replacement without extending
+            # the identity filename beyond Windows' legacy path-length limit.
+            with NamedTemporaryFile(dir=self.path.parent, prefix='.checkpoint-',
+                                    suffix='.tmp', delete=False) as stream:
+                temp = Path(stream.name)
+                stream.write(sha256(payload).hexdigest().encode()+b'\n'+payload)
+            temp.replace(self.path)
+        finally:
+            if temp is not None:
+                temp.unlink(missing_ok=True)
