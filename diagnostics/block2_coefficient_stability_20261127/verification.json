@@ -1,0 +1,21 @@
+{
+  "full_offline_suite": {
+    "tests": 155,
+    "passed": true,
+    "seconds": 464.817
+  },
+  "final_focused_checks": {
+    "tests": 31,
+    "passed": true,
+    "seconds": 0.975
+  },
+  "independent_licensed_study": {
+    "physical_device_validated": false,
+    "fresh_fde_solves": 46,
+    "execution_completed": true,
+    "seconds": 2241.422,
+    "settings_times_sentinels": 20,
+    "validation_status": "review"
+  },
+  "note": "The final fixed-endpoint coefficient preflight was added after the licensed study and covered by the focused regressions. It does not change raw FDE physics, mode selection or coefficient arithmetic. Numerical and extraction failures remain reported."
+}

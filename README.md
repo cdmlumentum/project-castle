@@ -10,11 +10,18 @@ This checkout includes local MODE integration and an optional native Lumerical s
 
 Use `python tools/run_vlac.py ...` to run this checkout explicitly; another `vlac` package may already be installed on this computer. `python tools/run_tests.py` likewise selects this checkout. Installation with `python -m pip install -e .` makes the `vlac` and `vlac-native` entry points available in the selected Python environment.
 
-`config/default.json` retains the original Python calculation path. `config/native.json` selects native LSF mode selection, coefficient extraction with reusable raw eigenproblem samples, while retaining the adaptive endpoint search, SciPy Powell optimizer and saved block format. Original reference files are in [docs/references](docs/references/README.md).
+`config/default.json` (also used when `--config` is omitted) and `config/native.json` now default to `sequential_width_offset_v1`: fit width first, freeze it, then fit lateral offset, using guarded native MODE tracking. `config/python_joint.json` and `config/native_joint.json` retain the explicit joint-Powell paths. Saved/custom configurations keep their named method; their loading defaults are unchanged for compatibility. Original reference files are in [docs/references](docs/references/README.md).
+
+`config/native_sequential.json` also selects the [v0.26.4 sequential method](docs/changes/v26_4.md):
+fit upper width to isolated-guide detuning, freeze widths, then fit signed
+lateral offset to full complex coupling. Both profiles retain monotone cubic
+controls and fixed endpoints. Blocks 2 and 3 evaluate only the two endpoint
+wavelengths, including their longitudinal validation and retained-characterization
+paths. The endpoint extraction gates, optical mesh and tolerances remain unchanged.
 
 ## Reusable execution and broadband characterization (v26)
 
-See [v26 changes](CHANGES_v26.md) and [the execution guide](docs/methods/workflow-runtime.md) for durable attempts, shared caches, checkpoints, solve/time budgets, offline inspection/reporting and frozen-profile characterization. The native configuration now retains directly checked cross/bar broadband grids for propagation. The original Python configuration keeps edge-grid behavior unless `--characterize` is supplied. Neither path changes the physical model or reduced-mode formulation.
+See [v26 changes](CHANGES_v26.md) and [the execution guide](docs/methods/workflow-runtime.md) for durable attempts, shared caches, checkpoints, solve/time budgets, offline inspection/reporting and frozen-profile characterization. The native configuration retains directly checked cross/bar grids for propagation; Blocks 2/3 now use endpoint wavelengths only, including retained characterization. The explicit `config/python_joint.json` configuration keeps edge-grid behavior unless `--characterize` is supplied. Neither path changes the physical model or reduced-mode formulation.
 
 ## Block 0: domain and mesh calibration (v25)
 
@@ -179,9 +186,9 @@ The full workflow uses the same default:
 vlac run --config config/default.json
 ~~~
 
-Profile optimization uses bounded Powell with all controls normalized to [0,1], and evaluates only the two wavelength-band edges. After each optimized grid, direct FDE checks insert longitudinal midpoints at those two wavelengths and compare complex detuning/coupling with interpolation on the original z grid, normalized by the target coefficient scales. Only z is refined. If its midpoint check cannot fit within the maximum sample count, convergence remains unverified. Optimizer success and z-grid convergence are reported separately; neither checks interior wavelengths. The legacy `device.wavelength_samples_initial` setting no longer changes Block 2's wavelength sampling.
+Default profile optimization uses sequential bounded Powell: fit the monotone width controls to detuning, freeze them, then fit monotone offset controls to complex coupling. The 120-evaluation per-grid budget is shared equally between stages. Both stages evaluate only the two wavelength-band edges; explicit joint-Powell configurations remain available. After each optimized grid, direct FDE checks insert longitudinal midpoints at those two wavelengths and compare complex detuning/coupling with interpolation on the original z grid, normalized by the target coefficient scales. Only z is refined. If its midpoint check cannot fit within the maximum sample count, convergence remains unverified. Optimizer success and z-grid convergence are reported separately; neither checks interior wavelengths. The legacy `device.wavelength_samples_initial` setting no longer changes Block 2's wavelength sampling.
 
-New Block 2 results carry the two edge wavelengths into Blocks 3 and 4, so their saved coefficients and propagated performance also cover only those edges. Block 3 still performs its existing wavelength-midpoint diagnostic, which does not add interior points to the saved grid. A narrow-band or full-band performance claim requires separate interior-wavelength evaluation.
+New Block 2 results carry the two edge wavelengths into Blocks 3 and 4, so their saved coefficients and propagated performance also cover only those edges. Block 3 also restricts validation and retained characterization to those two wavelengths and performs only longitudinal midpoint checks. A narrow-band or full-band performance claim requires separate interior-wavelength evaluation.
 
 Raw eigenmode candidates are cached separately from reference-dependent mode selection for endpoint, bare-mode and coupled-mode solves. The raw key represents the active geometry, materials, actual domain/mesh, trial modes and field grid; it excludes tracking references and the previous kappa. The lower-guide raw key omits the absent upper-guide width/offset. Selected-mode and final coefficient caches retain their tracking/gauge and selection-threshold context.
 

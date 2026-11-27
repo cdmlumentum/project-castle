@@ -12,8 +12,9 @@ For certified transverse domains and meshes, see [Block 0 convergence](block0-co
 
 | Execution choice | Endpoint search | Profile optimization | FDE and coefficient processing |
 | --- | --- | --- | --- |
-| Original package with `config/default.json` | v23 adaptive search or configured Python alternative | SciPy bounded Powell | Original Python adapter calling MODE |
-| Package with `config/native.json` | Same v23 algorithms | Same SciPy bounded Powell | Native raw batches, selectors and extraction; Python traverses tracked grids |
+| Default package (`config/default.json`, `config/native.json`, or no `--config`) | v23 adaptive search or configured Python alternative | Sequential width then offset Powell | Guarded native MODE tracking and raw FDE batches |
+| Explicit `config/python_joint.json` | Same v23 algorithms | Joint bounded Powell | Original Python adapter calling MODE |
+| Explicit `config/native_joint.json` | Same v23 algorithms | Joint bounded Powell | Native raw batches, selectors and extraction; Python traverses tracked grids |
 | Standalone MODE bundle | Explicit sampled-width pair search | Explicit bounded coordinate pattern search | Native LSF |
 
 The native standalone algorithms are alternatives to the adaptive search and Powell optimizer. A sampled-width result is the best feasible directly sampled pair; it does not claim search convergence or a global optimum. The coordinate pattern search terminates when its normalized step becomes sufficiently small or its evaluation budget is exhausted. A budget-limited result needs review.
@@ -23,6 +24,37 @@ The native package adapter writes schema 2 and reads older compatible handoffs. 
 The initial local comparison took approximately 75 versus 94 seconds for the Python/native cross-state sample and 98 versus 108 seconds for the bar-state sample. These are single samples under the current machine load. Keep Powell in Python and profile the repeated solve/cache boundary before making a speed-driven migration decision.
 
 ## Run this checkout
+
+The default `block2` and `validate-block2` commands use separate width-to-detuning
+and offset-to-coupling fits. `config/default.json`, `config/native.json` and
+`config/native_sequential.json` select the named `sequential_width_offset_v1`
+method with the native FDE backend and
+guarded tracking; see [v0.26.4](../changes/v26_4.md) for stage budgets, endpoint-wavelength-only validation and the remaining
+coefficient-extraction blocker.
+The standalone native bundle does not implement this method.
+
+Block 2 exports `block2_geometry.json` (fixed dimensions and exact cubic spline
+controls), a dense geometry CSV, and `block2_target_comparison.{json,csv,png,pdf}`.
+The comparison uses Δβ = βupper − βlower, targets −D cos(θ) and (D/2) sin(θ),
+and the full complex κ residual. Absolute upper/lower β values are included in
+the CSV; the workflow imposes a target on their difference. The JSON reports
+maximum and RMS errors separately at every saved wavelength and verifies the
+reported minimax objective against the coefficients. Plot lines between FDE
+samples are for display; dense analytic targets do not imply dense FDE sampling.
+
+For an eight-hour completion plan, use `block2 --complete-within-seconds 27000
+--max-seconds 28800` with the ordinary endpoint/config/output arguments. The
+explicit alternative `bounded_powell_time_planned` measures the slowest completed
+grid per-sample cost and reserves a fresh midpoint grid, another evaluation's
+margin, and 15 minutes for exports/cleanup, using a 1.5 timing factor. It ends
+optional Powell work and defers further refinement when that reserve is needed;
+it still evaluates the selected geometry's midpoint grid and publishes a complete
+Block 2 handoff with honest convergence flags. It never coarsens the optical
+mesh, changes the endpoints, or loosens tolerances. `--max-seconds` remains a
+last-resort execution guard, not the scheduling mechanism. Solver stalls,
+license loss, or large timing changes cannot be guaranteed to fit an estimate.
+Each improved feasible evaluation also saves a candidate JSON in the current
+attempt. Candidates are explicitly incomplete and cannot serve as block handoffs.
 
 Run these commands from the repository root. The launchers select the local source instead of any other installed `vlac` package.
 
@@ -35,14 +67,15 @@ python tools/run_vlac.py block4 --config config/native.json --bar-dir outputs/na
 
 These are production commands and can require many FDE solves. A completed compatible endpoint or profile directory can be supplied directly, including an existing v23 result. A Block 2 smoke execution can limit work using `--max-evaluations 2 --max-refinements 0`; its status will commonly be `review`.
 
-`solver.engine` is `python` by default and `native` in the supplied native configuration. GUI visibility, API path and thread settings retain their original configuration behavior. The provided native configuration hides newly launched MODE sessions and uses a separate cache file.
+The supplied default and native configurations both select `solver.engine=native`. The explicit `config/python_joint.json` retains the Python backend; omitted fields in saved/custom configurations retain their historical defaults. GUI visibility, API path and thread settings retain their original configuration behavior. The provided native configuration hides newly launched MODE sessions and uses a separate cache file.
 
 ## Prepare standalone MODE blocks
 
-Preparing a bundle does not launch MODE or use a solver license:
+Preparing a bundle does not launch MODE or use a solver license. Use the explicit
+joint configuration because standalone LSF does not support sequential fitting:
 
 ```powershell
-python tools/run_vlac.py native prepare --config config/native.json --out outputs/native_bundle
+python tools/run_vlac.py native prepare --config config/native_joint.json --out outputs/native_bundle
 ```
 
 The bundle contains embedded material tables in `native_config.mat`, the native function libraries, and `block1.lsf`, `block2.lsf` and `block3.lsf`. Open the scripts in MODE and run them in order. Each script saves a native MAT handoff and, after successful execution, an LMS project. The entry scripts contain the bundle's absolute working directory; regenerate the bundle after moving it.
@@ -51,18 +84,18 @@ Block 1 uses `adaptive_max_widths` evenly spaced widths unless `--width-samples`
 
 Block 1 retains those ten selected modes and their SI tracking-grid coordinates in `block1_native.mat`. Before saving `block1.lms`, its entry script performs one additional full-domain solve with both guides enabled at the selected input width/offset, cross liquid state and minimum wavelength. All entry scripts first save an incomplete MAT and empty LMS using safe-mode-compatible commands; a successful result replaces them. Published Python outputs are retained in immutable attempts, so a failed rerun does not replace a prior success. MODE `native run` and `native import` publish the two-panel endpoint beta plot (PNG/PDF), field NPZ/PNG, `endpoint_diagnostics.json`, and a copy of that LMS under `python/block1`. Running the LSF directly produces the MAT/LMS files; import generates the Python plots. These outputs are inspection evidence, separate from the scalar versioned handoff.
 
-Block 2 holds endpoint widths and offsets fixed, evaluates the clamped cubic profiles at the two band edges, fits the cross-state Blackman targets with the minimax objective, and checks coefficient interpolation at independent z midpoints. Its optimizer is named `coordinate_pattern`. This follows the current project's band-edge-only Block 2 policy. Block 3 reuses that exact profile and common grid in the bar state, with independent z and wavelength midpoint checks, no profile optimization and no bar target fit.
+Block 2 holds endpoint widths and offsets fixed, evaluates the clamped cubic profiles at the two band edges, fits the cross-state Blackman targets with the minimax objective, and checks coefficient interpolation at independent z midpoints. Its optimizer is named `coordinate_pattern`. This follows the current project's band-edge-only Block 2 policy. Block 3 reuses that exact profile and common grid in the bar state, with independent z midpoint checks at those endpoint wavelengths only, no profile optimization and no bar target fit.
 
 The standalone optimizer currently supports the default unconstrained slope and curvature settings. Preparation rejects explicit slope or curvature limits; use the native package path with the existing Powell optimizer for those limits. Standalone endpoint search requires fixed gap and rib height and the existing state-independent lower-guide assumption. Missing modes, rejected mode eligibility, API failures and failed handoffs remain distinct outcomes.
 
 To start from an existing block result:
 
 ```powershell
-python tools/run_vlac.py native prepare --config config/native.json --endpoint-dir outputs/native_endpoint --out outputs/native_from_endpoint
-python tools/run_vlac.py native prepare --config config/native.json --profile-dir outputs/native_profile --out outputs/native_from_profile
+python tools/run_vlac.py native prepare --config config/native_joint.json --endpoint-dir outputs/native_endpoint --out outputs/native_from_endpoint
+python tools/run_vlac.py native prepare --config config/native_joint.json --profile-dir outputs/native_joint_profile --out outputs/native_from_profile
 ```
 
-The first command seeds the native Block 1 handoff. The second seeds both Blocks 1 and 2, allowing direct execution of `block3.lsf`.
+The first command seeds the native Block 1 handoff. The second requires a compatible joint-Powell profile, seeds both Blocks 1 and 2, and allows direct execution of `block3.lsf`. A sequential profile cannot be relabeled as a standalone joint result.
 
 ## Run or import through Python
 
@@ -83,7 +116,7 @@ python tools/run_vlac.py native import --bundle outputs/native_bundle --block 3
 Import uses a MODE session to read the native MAT data. It validates bundle identity, the original endpoint constraints, coefficient arithmetic and the profile/grid contract before publishing the standard JSON result under `python/blockN` in the bundle. That output can feed the existing propagation stage:
 
 ```powershell
-python tools/run_vlac.py block4 --config config/native.json --bar-dir outputs/native_bundle/python/block3 --out outputs/native_propagation
+python tools/run_vlac.py block4 --config config/native_joint.json --bar-dir outputs/native_bundle/python/block3 --out outputs/native_propagation
 ```
 
 The bundle manifest records its configuration and script checksums. Prepare a new bundle when those inputs change. A changed algorithm or implementation receives a new source identity. Native result conversion returns exit code 0 for passed checks, 3 for a usable result needing review, and 2 for failure.
@@ -105,6 +138,29 @@ Implementation parity does not establish mesh/domain convergence, interpolation 
 The endpoint beta plot joins only the calculated endpoints with straight lines over the configured length. It does not evaluate interior widths or replace Block 2. Mode-profile archives contain complex, normalized transverse Ex/Ey on the same tracking grid used for selection; individual intensity panels are scaled to their own peaks. `endpoint_diagnostics.json` records the array mapping, coordinates, mode identities and saved-project geometry. The extra project solve leaves production mesh, domain, tracking and selection conventions unchanged.
 
 ## Sources and implementation files
+
+For the named guarded-tracking / monotone-Powell alternative, use
+`config/native_monotone.json` with the package `block2` command. See
+[v0.26.2 tracking review](../changes/v26_2.md) for the endpoint preflight,
+bounded recovery, candidate rejection and short-pilot requirements. These
+settings are not supported by the standalone coordinate-pattern bundle.
+
+For a capped exploratory pilot, `tools/prepare_tracking_pilot.py` now sets the
+explicit `warn_exploratory` endpoint domain policy. Mode identity, detuning signs
+and coefficient extraction still must pass. Strict mode remains the default.
+See [v0.26.3](../changes/v26_3.md) for its budget restrictions and the independent
+`tools/check_block2_coefficient_stability.py` mesh/domain sensitivity check.
+
+The endpoint-field diagnostic runs only selected 1260 nm isolated cross-sections:
+
+```powershell
+python tools/diagnose_block2_tracking.py --block1 outputs/endpoint --block2 outputs/profile --out diagnostics/tracking
+```
+
+It reads original fields where available and labels fresh reconstructions.
+Its fresh-solve budget is 60 FDE solves / 45 minutes; it does not run either
+optimization block. Field alignment uses the existing transverse E-field norm,
+not Ansys's electromagnetic power-overlap integral.
 
 - `src/vlac/native/vlac_core.lsf`: geometry, FDE, interpolation, tracking, extraction, B-splines and complete profile grids.
 - `src/vlac/native/vlac_blocks.lsf`: standalone searches and midpoint convergence checks.

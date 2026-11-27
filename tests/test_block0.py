@@ -124,7 +124,7 @@ class BlockZeroTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.out = Path(self.temp.name)
-        base = load_config(ROOT/'config/default.json')
+        base = load_config(ROOT/'config/python_joint.json')
         self.config = replace(base, convergence=replace(base.convergence, max_solves=5000, max_seconds=120,
             comparison_dx_m=2e-6, comparison_dy_m=1e-6, timing_repeats=1, reference_sentinels=2,
             reference_domain_factors=[1., 1.25, 1.5], reference_mesh_factors=[1., .75, .5],

@@ -162,7 +162,7 @@ class SignRestrictionTests(unittest.TestCase):
 
 class EndpointTests(unittest.TestCase):
     def setUp(self):
-        base = load_config(ROOT/'config/default.json')
+        base = load_config(ROOT/'config/python_joint.json')
         self.config = replace(base, endpoint_search=replace(base.endpoint_search, method='python_pso'))
         self.bank = build_material_bank(self.config)
 

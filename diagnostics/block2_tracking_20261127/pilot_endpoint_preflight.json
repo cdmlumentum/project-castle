@@ -1,0 +1,46 @@
+{
+  "checks": [
+    {
+      "end": "input",
+      "neff_errors": {
+        "lower": 1.992167692089631e-05,
+        "upper": 1.7529709279677645e-05
+      },
+      "passed": true,
+      "same_detuning_sign": true,
+      "wavelength_m": 1.26e-06
+    },
+    {
+      "end": "output",
+      "neff_errors": {
+        "lower": 1.992167692089631e-05,
+        "upper": 2.5597360877318848e-05
+      },
+      "passed": false,
+      "same_detuning_sign": true,
+      "wavelength_m": 1.26e-06
+    },
+    {
+      "end": "input",
+      "neff_errors": {
+        "lower": 2.006859829537788e-05,
+        "upper": 1.9711000742338884e-05
+      },
+      "passed": false,
+      "same_detuning_sign": true,
+      "wavelength_m": 1.34e-06
+    },
+    {
+      "end": "output",
+      "neff_errors": {
+        "lower": 2.006859829537788e-05,
+        "upper": 2.7633178590057766e-05
+      },
+      "passed": false,
+      "same_detuning_sign": true,
+      "wavelength_m": 1.34e-06
+    }
+  ],
+  "neff_tolerance": 2e-05,
+  "passed": false
+}

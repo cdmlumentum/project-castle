@@ -263,7 +263,7 @@ def main():
     parser.add_argument("--cache-only", action="store_true")
     parser.add_argument("--max-solves", type=int, default=24)
     parser.add_argument("--max-seconds", type=float, default=900)
-    parser.add_argument("--config", default=str(ROOT / "config/default.json"))
+    parser.add_argument("--config", default=str(ROOT / "config/python_joint.json"))
     parser.add_argument("--out", default=str(ROOT / "diagnostics/native_mode"))
     args = parser.parse_args()
     output = Path(args.out).resolve(); output.mkdir(parents=True, exist_ok=True)

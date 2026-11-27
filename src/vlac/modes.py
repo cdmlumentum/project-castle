@@ -19,12 +19,19 @@ class ModeSnapshot:
     te_fraction: float
     core_fraction: float
     identity: str
+    x_m: np.ndarray | None = None
+    y_m: np.ndarray | None = None
+    center_x_m: float = 0.0
 
     def fingerprint(self) -> str:
         digest = hashlib.sha256()
         digest.update(np.asarray([self.neff.real, self.neff.imag]).tobytes())
         digest.update(self.ex[::4, ::4].astype(np.complex64).tobytes())
         digest.update(self.ey[::4, ::4].astype(np.complex64).tobytes())
+        if self.x_m is not None:
+            digest.update(np.asarray(self.x_m).tobytes())
+            digest.update(np.asarray(self.y_m).tobytes())
+            digest.update(np.asarray([self.center_x_m]).tobytes())
         return digest.hexdigest()
 
 
@@ -33,6 +40,7 @@ class ModeReference:
     upper: ModeSnapshot
     lower: ModeSnapshot
     supermodes: tuple[ModeSnapshot, ModeSnapshot]
+    valid: bool = True
 
     def fingerprint(self) -> str:
         values = (
@@ -41,7 +49,7 @@ class ModeReference:
             self.supermodes[0].fingerprint(),
             self.supermodes[1].fingerprint(),
         )
-        return hashlib.sha256("|".join(values).encode()).hexdigest()
+        return hashlib.sha256(("|".join(values)+str(self.valid)).encode()).hexdigest()
 
 
 @dataclass

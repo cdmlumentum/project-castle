@@ -179,6 +179,9 @@ function vlac_raw(cfg,geometry,wavelength,upper_enabled,lower_enabled,compact) {
                     }
                     snapshot.core_fraction=fraction;
                     snapshot.identity=card+"@"+num2str(real(snapshot.neff),"%.9f");
+                    snapshot.x_m=xtrack; snapshot.y_m=ytrack;
+                    snapshot.center_x_m=0;
+                    if (upper_enabled&(!lower_enabled)) { snapshot.center_x_m=upper_x; }
                     usable=usable+1; cards{usable}=snapshot;
                 }
             }

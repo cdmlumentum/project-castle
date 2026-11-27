@@ -1,0 +1,30 @@
+{
+  "full_offline_suite": {
+    "tests": 147,
+    "passed": true,
+    "seconds": 348.641
+  },
+  "final_focused_guarded_and_handoff_checks": {
+    "tests": 29,
+    "passed": true,
+    "seconds": 192.735
+  },
+  "focused_native_and_guarded_checks": {
+    "tests": 21,
+    "passed": true,
+    "seconds": 1.102
+  },
+  "native_interpreter_math": {
+    "report": "native_math/comparison.json",
+    "passed": true,
+    "physical_fde_solves": 0
+  },
+  "licensed_endpoint_pilot": {
+    "objective_evaluations": 0,
+    "report": "pilot_assessment.json",
+    "midpoint_validation": "not_reached",
+    "physical_device_validated": false,
+    "endpoint_consistency_passed": false
+  },
+  "note": "Full offline suite preceded the final attempt-status reporting fix; the final focused tracking and handoff checks cover that fix. Synthetic tests establish implementation behavior, not physical device performance."
+}

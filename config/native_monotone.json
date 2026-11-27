@@ -1,0 +1,18 @@
+{
+  "materials": {
+    "silicon_data_csv": "data/green_si_2008_1260_1340.csv"
+  },
+  "solver": {
+    "engine": "native",
+    "hide_gui": true,
+    "tracking_method": "guarded_translation_v1",
+    "tracking_recovery_depth": 3
+  },
+  "optimizer": {
+    "method": "monotone_powell"
+  },
+  "output": {
+    "directory": "outputs/native_monotone",
+    "cache_sqlite": "outputs/native_monotone/cache/native_fde_cache.sqlite"
+  }
+}

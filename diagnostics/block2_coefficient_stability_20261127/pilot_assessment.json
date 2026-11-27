@@ -1,0 +1,35 @@
+{
+  "status": "discontinued_fixed_output_extraction_failure",
+  "intentional_diagnostic_stop": true,
+  "stop_reason": "Exploratory pilot intentionally discontinued after confirming negative kappa squared at the fixed output with correct modes; no interior-control optimization can repair a fixed endpoint. Independent mesh/domain study follows.",
+  "confirmed_fde_calls": {
+    "started": 39,
+    "completed": 39,
+    "failed": 0
+  },
+  "last_recorded_elapsed_seconds": 998.485,
+  "pending_solve_may_have_been_interrupted": true,
+  "valid_candidates_found": 0,
+  "target_fit_objective": null,
+  "midpoint_validation": "not_reached",
+  "longer_run_started": false,
+  "fixed_output_reselection_from_original_checksummed_cache": [
+    {
+      "wavelength_m": 1.26E-06,
+      "extraction_flag": "negative_kappa_squared",
+      "kappa_imag_rad_per_m": 945.3914241411314,
+      "delta_beta_real_rad_per_m": 52554.20226783492
+    },
+    {
+      "wavelength_m": 1.34E-06,
+      "extraction_flag": "negative_kappa_squared",
+      "kappa_imag_rad_per_m": -1537.3734313249436,
+      "delta_beta_real_rad_per_m": 57019.906395380385
+    }
+  ],
+  "comparison_scope": "Original raw packets were found using their original source identity and core hash, then reselected independently; these are diagnostic values, not accepted optimizer outputs.",
+  "completed_candidate_evaluations": 1,
+  "candidate_evaluations_started": 2,
+  "in_progress_candidate_discarded": true,
+  "assessment_recorded_utc": "2026-11-27T14:02:11.802432Z"
+}

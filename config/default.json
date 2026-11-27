@@ -59,6 +59,9 @@
     "temperature_k": 300.0
   },
   "solver": {
+    "engine": "native",
+    "tracking_method": "guarded_translation_v1",
+    "endpoint_domain_policy": "strict",
     "api_path": "C:/Program Files/Lumerical/v221/api/python",
     "threads": 2,
     "hide_gui": false,
@@ -94,7 +97,7 @@
     "zero_mode_retries": 1
   },
   "optimizer": {
-    "method": "bounded_powell",
+    "method": "sequential_width_offset_v1",
     "control_points": 6,
     "max_function_evaluations_per_grid": 120,
     "max_grid_refinements": 2,

@@ -26,7 +26,7 @@ from vlac.solver import LumapiBackend
 
 class RevisionTests(unittest.TestCase):
     def setUp(self):
-        self.config = load_config(ROOT/'config/default.json')
+        self.config = load_config(ROOT/'config/python_joint.json')
         self.bank = build_material_bank(self.config)
 
     @staticmethod

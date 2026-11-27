@@ -52,7 +52,7 @@ def fixture_modes():
 
 class AdaptiveTests(unittest.TestCase):
     def setUp(self):
-        self.config=load_config(ROOT/'config/default.json')
+        self.config=load_config(ROOT/'config/python_joint.json')
         self.bank=build_material_bank(self.config)
 
     def test_shared_table_and_fresh_ten_modes(self):
@@ -171,7 +171,7 @@ class AdaptiveTests(unittest.TestCase):
 
 class CacheAndTemplateTests(unittest.TestCase):
     def setUp(self):
-        self.config=load_config(ROOT/'config/default.json');self.bank=build_material_bank(self.config)
+        self.config=load_config(ROOT/'config/python_joint.json');self.bank=build_material_bank(self.config)
 
     def test_lower_raw_cache_ignores_absent_upper_geometry(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -258,7 +258,7 @@ class CacheAndTemplateTests(unittest.TestCase):
 
 class ProfileTests(unittest.TestCase):
     def setUp(self):
-        self.config=load_config(ROOT/'config/default.json');self.bank=build_material_bank(self.config)
+        self.config=load_config(ROOT/'config/python_joint.json');self.bank=build_material_bank(self.config)
         self.endpoint=EndpointSearchResult(1e-6,175e-9,.6e-6,1.2e-6,100.,np.array([1.26e-6,1.34e-6]),[],[],False,[],{})
 
     @staticmethod

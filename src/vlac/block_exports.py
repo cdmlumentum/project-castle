@@ -22,7 +22,10 @@ def export_profiles(output, config, endpoint, solution, bar=None):
         selected = [r for r in coefficients if r['state']==state]
         if selected: _write_csv(out/f'{state}_coefficients.csv',list(selected[0]),selected)
     _plot_profiles(out,solution,bar,endpoint,config)
+    from .profile_diagnostics import export_profile_diagnostics
+    diagnostics = export_profile_diagnostics(out,config,endpoint,solution)
     write_json(out/'optimizer_history.json',{'objective_achieved':solution.objective,'grid_converged':solution.grid_converged,
         'grid_history':solution.grid_convergence_history,'optimizer_history':solution.optimizer_history,
         'endpoint_search_converged':endpoint.converged,
         'objective_definition':'max(abs(Re(delta)-target)/D, abs(kappa-target)/(D/2)) across z and wavelength'})
+    return diagnostics

@@ -1,0 +1,172 @@
+{
+  "anchor_checks": [
+    {
+      "aligned_field_overlap": 0.9999874324560972,
+      "compact_neff": {
+        "imag": -7.409651055554321e-16,
+        "real": 1.7371611956144235
+      },
+      "compact_neff_error": 9.860761315262648e-32,
+      "end": "input",
+      "full_neff": {
+        "imag": -7.425546383949075e-16,
+        "real": 1.7371436659051436
+      },
+      "guide": "upper",
+      "wavelength_m": 1.26e-06
+    },
+    {
+      "aligned_field_overlap": 0.999998715206747,
+      "compact_neff": {
+        "imag": 4.230899244952236e-18,
+        "real": 1.748787173821377
+      },
+      "compact_neff_error": 7.703719777548943e-34,
+      "end": "input",
+      "full_neff": {
+        "imag": 9.253283867255282e-18,
+        "real": 1.7488070954982977
+      },
+      "guide": "lower",
+      "wavelength_m": 1.26e-06
+    },
+    {
+      "aligned_field_overlap": 0.9999991976420358,
+      "compact_neff": {
+        "imag": -1.3620324015734968e-16,
+        "real": 1.7593204670871034
+      },
+      "compact_neff_error": 2.220446049250313e-16,
+      "end": "output",
+      "full_neff": {
+        "imag": -1.623967376833692e-16,
+        "real": 1.759346064447981
+      },
+      "guide": "upper",
+      "wavelength_m": 1.26e-06
+    },
+    {
+      "aligned_field_overlap": 0.999998715206747,
+      "compact_neff": {
+        "imag": 4.230899244952236e-18,
+        "real": 1.748787173821377
+      },
+      "compact_neff_error": 7.703719777548943e-34,
+      "end": "output",
+      "full_neff": {
+        "imag": 9.253283867255282e-18,
+        "real": 1.7488070954982977
+      },
+      "guide": "lower",
+      "wavelength_m": 1.26e-06
+    },
+    {
+      "aligned_field_overlap": 0.9999863000050799,
+      "compact_neff": {
+        "imag": -3.3803300181045355e-14,
+        "real": 1.7185955389085295
+      },
+      "compact_neff_error": 0.0,
+      "end": "input",
+      "full_neff": {
+        "imag": -3.37750677151207e-14,
+        "real": 1.718575827907787
+      },
+      "guide": "upper",
+      "wavelength_m": 1.34e-06
+    },
+    {
+      "aligned_field_overlap": 0.9999986809018722,
+      "compact_neff": {
+        "imag": 1.9519354148245612e-17,
+        "real": 1.7297994412345965
+      },
+      "compact_neff_error": 0.0,
+      "end": "input",
+      "full_neff": {
+        "imag": 1.4008146635671505e-17,
+        "real": 1.729819509832892
+      },
+      "guide": "lower",
+      "wavelength_m": 1.34e-06
+    },
+    {
+      "aligned_field_overlap": 0.999999088030449,
+      "compact_neff": {
+        "imag": -7.859297229337434e-15,
+        "real": 1.741952376597301
+      },
+      "compact_neff_error": 0.0,
+      "end": "output",
+      "full_neff": {
+        "imag": -7.814272068885956e-15,
+        "real": 1.741980009775891
+      },
+      "guide": "upper",
+      "wavelength_m": 1.34e-06
+    },
+    {
+      "aligned_field_overlap": 0.9999986809018722,
+      "compact_neff": {
+        "imag": 1.9519354148245612e-17,
+        "real": 1.7297994412345965
+      },
+      "compact_neff_error": 0.0,
+      "end": "output",
+      "full_neff": {
+        "imag": 1.4008146635671505e-17,
+        "real": 1.729819509832892
+      },
+      "guide": "lower",
+      "wavelength_m": 1.34e-06
+    }
+  ],
+  "checks": [
+    {
+      "end": "input",
+      "neff_errors": {
+        "lower": 1.992167692089631e-05,
+        "upper": 1.7529709279677645e-05
+      },
+      "passed": true,
+      "same_detuning_sign": true,
+      "wavelength_m": 1.26e-06
+    },
+    {
+      "end": "output",
+      "neff_errors": {
+        "lower": 1.992167692089631e-05,
+        "upper": 2.5597360877318848e-05
+      },
+      "passed": false,
+      "same_detuning_sign": true,
+      "wavelength_m": 1.26e-06
+    },
+    {
+      "end": "input",
+      "neff_errors": {
+        "lower": 2.006859829537788e-05,
+        "upper": 1.9711000742338884e-05
+      },
+      "passed": false,
+      "same_detuning_sign": true,
+      "wavelength_m": 1.34e-06
+    },
+    {
+      "end": "output",
+      "neff_errors": {
+        "lower": 2.006859829537788e-05,
+        "upper": 2.7633178590057766e-05
+      },
+      "passed": false,
+      "same_detuning_sign": true,
+      "wavelength_m": 1.34e-06
+    }
+  ],
+  "detuning_signs_passed": true,
+  "exploratory_warning": true,
+  "field_identity_passed": true,
+  "neff_tolerance": 2e-05,
+  "passed": false,
+  "policy": "warn_exploratory"
+}

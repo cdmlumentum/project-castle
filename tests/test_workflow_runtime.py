@@ -61,14 +61,14 @@ class StorageTests(unittest.TestCase):
             self.assertEqual((Path(folder)/'result.txt').read_text(),'good')
 
     def test_budget_reserves_retries(self):
-        config=load_config(ROOT/'config/default.json')
+        config=load_config(ROOT/'config/python_joint.json')
         budget=RunBudget(replace(config.execution,max_solves=3))
         budget.check(3);budget.consume(2)
         with self.assertRaises(BudgetExceeded):budget.check(2)
         budget.check(1)
 
     def test_cache_only_backend_never_imports_or_opens_mode(self):
-        config=load_config(ROOT/'config/default.json')
+        config=load_config(ROOT/'config/python_joint.json')
         with tempfile.TemporaryDirectory() as folder, patch.object(LumapiBackend,'_import_lumapi',side_effect=AssertionError('license acquired')):
             with NativeLumapiBackend(config,cache_path=Path(folder)/'cache.sqlite') as backend:
                 backend.preflight(1.3e-6)
@@ -77,7 +77,7 @@ class StorageTests(unittest.TestCase):
                 self.assertEqual(backend.evaluate_coefficients(geometry(config),1.3e-6),('cached','reference'))
 
     def test_native_raw_reuses_lower_guide_and_reselects(self):
-        config=load_config(ROOT/'config/default.json')
+        config=load_config(ROOT/'config/python_joint.json')
         raw={'ok':1.,'error':'','attempts':1.,'n':2.,'items':[asdict(m) for m in fixture_modes()]}
         with tempfile.TemporaryDirectory() as folder, NativeLumapiBackend(config,cache_path=Path(folder)/'cache.sqlite') as backend:
             requests=[backend._raw_request(geometry(config,width=w,offset=d),1.3e-6,False,True)
@@ -96,7 +96,7 @@ class CharacterizationTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.root=Path(self.temp.name)
-        base=load_config(ROOT/'config/default.json')
+        base=load_config(ROOT/'config/python_joint.json')
         self.config=replace(base,project_root=self.root,
             materials=replace(base.materials,silicon_data_csv=str(ROOT/'data/green_si_2008_1260_1340.csv')),
             device=replace(base.device,z_samples_initial=3,wavelength_samples_initial=3,z_samples_max=9,wavelength_samples_max=9),

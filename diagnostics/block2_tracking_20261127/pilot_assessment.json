@@ -1,0 +1,21 @@
+{
+  "status": "blocked_by_endpoint_consistency",
+  "pilot_directory": "C:\\Users\\mos68521\\OneDrive - Lumentum Operations LLC\\Documents\\ChatGPT\\project-castle\\outputs\\block2_guarded_pilot_20261127",
+  "attempt": ".attempts/832af4c9f6c44ef49161c122643ed6d4",
+  "elapsed_seconds": 213.407,
+  "physical_fde_calls": {
+    "started": 7,
+    "completed": 7,
+    "failed": 0
+  },
+  "objective_evaluations": 0,
+  "optimization_started": false,
+  "midpoint_validation": "not_reached",
+  "longer_run_started": false,
+  "endpoint_consistency_passed": false,
+  "tolerance_changed": false,
+  "optical_settings_changed": false,
+  "block0_certificate_applied": false,
+  "physical_device_validated": false,
+  "next_step": "Resolve compact/full-domain numerical consistency at unchanged tolerances before optimizing or starting a longer run."
+}

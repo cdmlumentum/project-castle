@@ -24,7 +24,7 @@ from vlac.profiles import evaluate_design_profiles
 
 class NativeBackendTests(unittest.TestCase):
     def setUp(self):
-        self.config = load_config(ROOT / "config/default.json")
+        self.config = load_config(ROOT / "config/python_joint.json")
 
     def adapter(self, folder=None):
         backend = object.__new__(NativeLumapiBackend)

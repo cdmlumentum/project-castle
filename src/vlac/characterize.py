@@ -33,20 +33,25 @@ def interpolation_error(base, actual, z, wavelengths, zz, ww, scale, length):
     return error
 
 
-def characterize_profile(backend, config, bank, endpoint, solution, *, progress=None):
+def characterize_profile(backend, config, bank, endpoint, solution, *, progress=None, endpoint_wavelengths_only=False):
+    method = 'direct_nested_z_band_edges_v1' if endpoint_wavelengths_only else 'direct_nested_tensor_pchip_v1'
     geometry = geometry_data(config, endpoint, solution)
     identity = checkpoint_identity(config, 3, {'geometry': geometry['geometry_id'],
         'sampling': {'initial_wavelengths': config.device.wavelength_samples_initial,
                      'max_z': config.device.z_samples_max, 'max_wavelengths': config.device.wavelength_samples_max},
-        'method': 'direct_nested_tensor_pchip_v1', 'initial_z': solution.z_m, 'initial_wavelengths': solution.wavelengths_m})
+        'method': method, 'initial_z': solution.z_m, 'initial_wavelengths': solution.wavelengths_m})
     checkpoint = Checkpoint(checkpoint_directory(config), 'characterization', identity)
     saved = checkpoint.load() if config.execution.resume else None
     if saved and saved.get('complete'):
         validate_characterization(saved['result'], config, endpoint, solution)
         return saved['result']
     z = np.asarray(saved['z'] if saved else solution.z_m)
-    wavelengths = np.asarray(saved['wavelengths'] if saved else np.unique(np.r_[solution.wavelengths_m,
-        np.linspace(config.device.wavelength_min_m, config.device.wavelength_max_m, config.device.wavelength_samples_initial)]))
+    initial_wavelengths = ([config.device.wavelength_min_m,config.device.wavelength_max_m] if endpoint_wavelengths_only
+        else np.unique(np.r_[solution.wavelengths_m,np.linspace(config.device.wavelength_min_m,
+                         config.device.wavelength_max_m,config.device.wavelength_samples_initial)]))
+    wavelengths = np.asarray(saved['wavelengths'] if saved else initial_wavelengths)
+    if endpoint_wavelengths_only and not np.array_equal(wavelengths,initial_wavelengths):
+        raise ValueError('Endpoint-only characterization cannot resume an interior-wavelength grid.')
     history = saved['history'] if saved else []
     grids = saved['grids'] if saved else None
     def evaluate(zz, ww):
@@ -57,7 +62,7 @@ def characterize_profile(backend, config, bank, endpoint, solution, *, progress=
         grids = evaluate(z, wavelengths)
     passed = False
     for iteration in range(len(history), config.characterization.max_refinements+1):
-        zz, ww = refine(z), refine(wavelengths)
+        zz, ww = refine(z), wavelengths if endpoint_wavelengths_only else refine(wavelengths)
         if len(zz)>config.device.z_samples_max or len(ww)>config.device.wavelength_samples_max:
             history.append({'iteration': iteration, 'passed': False, 'reason': 'axis_limit_before_independent_check'})
             break
@@ -73,14 +78,16 @@ def characterize_profile(backend, config, bank, endpoint, solution, *, progress=
         checkpoint.save({'z': z, 'wavelengths': wavelengths, 'grids': grids, 'history': history})
         if passed:
             break
-    result = {'schema_version': 1, 'method': 'direct_nested_tensor_pchip_v1',
+    result = {'schema_version': 1, 'method': method,
               'geometry_id': geometry['geometry_id'], 'z_m': z.tolist(), 'wavelengths_m': wavelengths.tolist(),
               'cross': coefficient_data(grids['cross']), 'bar': coefficient_data(grids['bar']),
               'validation': {'status': 'passed' if passed else 'review', 'sampling_converged': passed,
                              'tolerance': config.device.grid_convergence_rtol, 'history': history,
                              'error_metric': 'max normalized complex detuning/coupling error and 2*length*common-attenuation error',
                              'profile_optimized': False, 'physical_device_validation': False,
-                             'scope': 'Direct cross/bar coefficient interpolation checks in z and wavelength, including joint midpoints.'}}
+                             'wavelength_validation':('endpoint wavelengths only; no interior checks' if endpoint_wavelengths_only else 'joint wavelength midpoint checks'),
+                             'scope': ('Direct cross/bar z interpolation checks at endpoint wavelengths only.' if endpoint_wavelengths_only else
+                                       'Direct cross/bar coefficient interpolation checks in z and wavelength, including joint midpoints.')}}
     result['sha256'] = digest(result)
     validate_characterization(result, config, endpoint, solution)
     checkpoint.save({'complete': passed, 'result': result, 'z': z, 'wavelengths': wavelengths,
@@ -96,9 +103,12 @@ def validate_characterization(value, config, endpoint, solution):
     if value['geometry_id'] != geometry_data(config, endpoint, solution)['geometry_id']:
         raise ValueError('Characterization belongs to different frozen geometry')
     z, wavelengths = np.asarray(value['z_m']), np.asarray(value['wavelengths_m'])
-    for axis, bounds in ((z, [0, config.device.length_m]),
-                         (wavelengths, [config.device.wavelength_min_m, config.device.wavelength_max_m])):
-        if len(axis)<3 or not np.all(np.isfinite(axis)) or np.any(np.diff(axis)<=0) or not np.allclose(axis[[0,-1]], bounds, rtol=0, atol=1e-15):
+    endpoint_only = value.get('method')=='direct_nested_z_band_edges_v1'
+    if endpoint_only and not np.array_equal(wavelengths,[config.device.wavelength_min_m,config.device.wavelength_max_m]):
+        raise ValueError('Endpoint-only characterization contains other wavelengths.')
+    for axis, bounds, minimum in ((z, [0, config.device.length_m],3),
+                         (wavelengths, [config.device.wavelength_min_m, config.device.wavelength_max_m],2 if endpoint_only else 3)):
+        if len(axis)<minimum or not np.all(np.isfinite(axis)) or np.any(np.diff(axis)<=0) or not np.allclose(axis[[0,-1]], bounds, rtol=0, atol=1e-15):
             raise ValueError('Invalid characterization grid')
     for state in ('cross', 'bar'):
         quality = validate_grid(decode_coefficients(value[state]), replace(solution, z_m=z, wavelengths_m=wavelengths), config)

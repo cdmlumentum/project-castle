@@ -68,6 +68,11 @@ def physics_signature(config, block):
     if block>=2:
         signature['length_m'] = config.device.length_m
         signature['grid_convergence_rtol'] = config.device.grid_convergence_rtol
+        if config.solver.tracking_method != 'legacy' or config.optimizer.method != 'bounded_powell':
+            signature['profile_methods'] = {'tracking':config.solver.tracking_method,
+                'recovery_depth':config.solver.tracking_recovery_depth,'optimizer':config.optimizer.method}
+            if config.solver.endpoint_domain_policy != 'strict':
+                signature['profile_methods']['endpoint_domain_policy'] = config.solver.endpoint_domain_policy
     if block>=4: signature['propagation'] = raw['propagation']
     return clean(signature)
 
@@ -202,6 +207,10 @@ def validate_solution(solution, endpoint, config):
         if values.ndim!=1 or len(values)<4 or not np.all(np.isfinite(values)) or np.any(values<bounds[0]-1e-15) or np.any(values>bounds[1]+1e-15):
             raise ValueError('Saved profile controls are invalid or outside bounds.')
         if not np.allclose(values[[0,-1]],ends,rtol=0,atol=1e-15): raise ValueError('Saved profile endpoint controls changed.')
+        if config.optimizer.method in {'monotone_powell','sequential_width_offset_v1'}:
+            from .monotone import is_monotone
+            if not is_monotone(values):
+                raise ValueError('Saved profile violates monotone control ordering.')
     expected = target_profiles(solution.z_m,config.device.length_m,endpoint.delta_beta_max_rad_per_m)
     for actual,target in zip((solution.delta_target_rad_per_m,solution.kappa_target_rad_per_m),expected):
         if actual.shape!=target.shape or not np.allclose(actual,target,rtol=1e-10,atol=1e-6): raise ValueError('Saved coefficient targets are inconsistent.')
@@ -215,7 +224,12 @@ def validate_solution(solution, endpoint, config):
     if _check_fabrication_constraints(config,ClampedCubicProfile(config.device.length_m,solution.w1_control_m),
                                      ClampedCubicProfile(config.device.length_m,solution.d_c2c_control_m)):
         raise ValueError('Saved profiles violate the current slope/curvature constraints.')
-    return validate_grid(solution.cross_coefficients,solution,config)
+    quality = validate_grid(solution.cross_coefficients,solution,config)
+    if config.solver.tracking_method == 'guarded_translation_v1':
+        from .tracking import endpoint_consistency
+        quality['endpoint_mode_consistency'] = endpoint_consistency(solution.cross_coefficients,solution.wavelengths_m,endpoint,config)
+        quality['passed'] = quality['passed'] and quality['endpoint_mode_consistency']['passed']
+    return quality
 
 
 def write_artifact(output, block, config, endpoint, *, solution=None, bar=None, performance=None, validation=None, source=None, characterization=None):

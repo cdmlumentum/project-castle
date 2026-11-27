@@ -312,9 +312,11 @@ function vlac_block3(cfg,profile) {
     if (profile.bundle_id!=cfg.bundle_id) { return result; }
     result.bundle_id=cfg.bundle_id;
     request=profile.request; request.state="bar";
+    if (length(request.wavelengths_m)!=2) { result.error="block3_requires_endpoint_wavelengths_only"; return result; }
+    if (max(abs(request.wavelengths_m-cfg.endpoint_wavelengths_m))>1e-15) { result.error="block3_requires_endpoint_wavelengths_only"; return result; }
     grid=vlac_profile(cfg,request);
     if (!grid.ok) { return grid; }
-    checks=vlac_grid_checks(cfg,request,grid,1);
+    checks=vlac_grid_checks(cfg,request,grid,0);
     if (!checks.ok) { return checks; }
     result.ok=1; result.error=""; result.profile=profile; result.grid=grid;
     result.request=request; result.grid_checks=checks; return result;
