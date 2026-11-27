@@ -14,6 +14,8 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--baseline',type=Path,required=True)
     parser.add_argument('--out',type=Path,required=True)
+    parser.add_argument('--method',choices=('sequential_width_offset_v1','monotone_powell'),
+                        default='sequential_width_offset_v1')
     args=parser.parse_args()
     out=args.out.resolve()
     if out.exists():
@@ -23,7 +25,7 @@ def main():
     cfg.solver.tracking_method='guarded_translation_v1'
     cfg.solver.tracking_recovery_depth=3
     cfg.solver.endpoint_domain_policy='warn_exploratory'
-    cfg.optimizer.method='monotone_powell'
+    cfg.optimizer.method=args.method
     cfg.optimizer.max_function_evaluations_per_grid=6
     cfg.optimizer.max_grid_refinements=0
     cfg.optimizer.complete_within_seconds=2700
@@ -37,10 +39,10 @@ def main():
     out.mkdir(parents=True)
     write_json(out/'pilot_config.json',cfg.as_dict())
     write_json(out/'pilot_plan.json',{
-        'method':'monotone_powell + guarded_translation_v1',
+        'method':args.method+' + guarded_translation_v1',
         'baseline_configuration':str(args.baseline.resolve()),
         'max_seconds':2700,'max_fresh_fde_solves':120,'max_objective_evaluations':6,
-        'midpoint_validation':'unchanged independent z midpoints and 0.01 tolerance',
+        'midpoint_validation':'independent z midpoints at endpoint wavelengths only; unchanged configured tolerance',
         'optical_settings_preserved':all(before[k]==cfg.as_dict()[k] for k in ('geometry','materials','device','convergence')),
         'solver_changes':{'tracking_method':cfg.solver.tracking_method,'tracking_recovery_depth':3,
                           'endpoint_domain_policy':'warn_exploratory'},

@@ -1,10 +1,10 @@
 # Workflow execution, reuse and characterization (v26)
 
-The computation remains an explicit dependency chain: Block 0 certifies transverse settings; Block 1 selects endpoints; Block 2 optimizes cross-state controls at the band edges; Block 3 extracts the bar state and optionally characterizes the frozen profile in both states across the band; Block 4 propagates the retained coefficients. Python owns search, scheduling, durable storage and publication. Native LSF owns eigensolves, candidate processing, mode selection and coupling extraction. This revision does not change the physical stack, material models or reduced-model basis, and does not add EME comparisons.
+The computation remains an explicit dependency chain: Block 0 certifies transverse settings; Block 1 selects endpoints; Block 2 optimizes cross-state controls at the band edges; Block 3 extracts the bar state and optionally characterizes the frozen profile in both states at those same two wavelengths; Block 4 propagates the retained coefficients. Python owns search, scheduling, durable storage and publication. Native LSF owns eigensolves, candidate processing, mode selection and coupling extraction. The physical stack, material models and reduced-model basis are unchanged; EME comparisons remain separate.
 
 ## Typical commands
 
-Run from this checkout with the supplied launchers. The native configuration enables retained broadband characterization; the Python default keeps the prior edge-grid Block 3 behavior unless `--characterize` is supplied.
+Run from this checkout with the supplied launchers. The native configuration enables retained characterization; Blocks 2 and 3 use endpoint wavelengths only, including longitudinal validation and retained-characterization paths. The Python default retains the base edge grid unless `--characterize` is supplied to retain additional directly checked z samples at those same wavelengths.
 
 ```powershell
 python tools/run_vlac.py plan --config config/native.json
@@ -55,7 +55,7 @@ Block 0 design checks reuse checksummed independent selected/reference samples k
 
 ## Frozen-profile characterization
 
-`characterize` runs Block 3 on saved Block 2 controls. It seeds the wavelength grid with the configured broadband samples and saved edges, then directly calculates cross/bar coefficients on nested z/wavelength grids including joint midpoints. It compares complex detuning, coupling and common attenuation against tensor PCHIP interpolation (the attenuation term uses the log-power estimate `2*length*error`), checks coefficient quality and retains the checked dense grid. The original optimization solution and its edge-grid evidence remain in the artifact. Block 3 also exports `characterization_coefficients.csv` and `characterization_summary.json`. Axis or refinement limits produce review, never a fabricated pass. This establishes sampled coefficient interpolation accuracy at the configured transverse discretization, not an error bound over all unsampled points.
+`characterize` runs Block 3 on saved Block 2 controls. It directly calculates cross/bar coefficients on nested z grids at the two endpoint wavelengths only, including longitudinal midpoints. It compares complex detuning, coupling and common attenuation against PCHIP interpolation (the attenuation term uses the log-power estimate `2*length*error`), checks coefficient quality and retains the checked z grid. The named method is `direct_nested_z_band_edges_v1`. The original optimization solution and its edge-grid evidence remain in the artifact. Block 3 also exports `characterization_coefficients.csv` and `characterization_summary.json`. Axis or refinement limits produce review, never a fabricated pass. This establishes sampled z interpolation accuracy at the configured transverse discretization and endpoints, with no interior-wavelength accuracy claim. Older saved broadband datasets remain readable for offline inspection/propagation; the separate Python library characterization function retains its explicit broadband option.
 
 Block 4 automatically uses the retained characterization dataset when present. Both launch columns share interpolated RK4 matrices and common attenuation; each launch retains its own convergence stopping step. Fixed endpoint widths, profile controls, upper-minus-lower detuning and the complex coupling branch are unchanged.
 

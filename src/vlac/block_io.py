@@ -207,7 +207,7 @@ def validate_solution(solution, endpoint, config):
         if values.ndim!=1 or len(values)<4 or not np.all(np.isfinite(values)) or np.any(values<bounds[0]-1e-15) or np.any(values>bounds[1]+1e-15):
             raise ValueError('Saved profile controls are invalid or outside bounds.')
         if not np.allclose(values[[0,-1]],ends,rtol=0,atol=1e-15): raise ValueError('Saved profile endpoint controls changed.')
-        if config.optimizer.method == 'monotone_powell':
+        if config.optimizer.method in {'monotone_powell','sequential_width_offset_v1'}:
             from .monotone import is_monotone
             if not is_monotone(values):
                 raise ValueError('Saved profile violates monotone control ordering.')

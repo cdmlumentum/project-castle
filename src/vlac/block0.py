@@ -792,7 +792,8 @@ def verify_saved_design(config, output, *, endpoint_dir=None, profile_dir=None, 
     return verify_design(config, output, endpoint, solution, evaluator_factory=evaluator_factory)
 
 
-def verify_design(config, output, endpoint, solution=None, *, bar=None, evaluator_factory=NativeEvaluator, resume=False):
+def verify_design(config, output, endpoint, solution=None, *, bar=None, evaluator_factory=NativeEvaluator, resume=False,
+                  endpoint_wavelengths_only=False):
     """Bounded fresh validation; this never creates another calibration certificate."""
     certificate = config.solver.calibration
     if certificate is None:
@@ -808,7 +809,8 @@ def verify_design(config, output, endpoint, solution=None, *, bar=None, evaluato
         wp = ClampedCubicProfile(config.device.length_m, solution.w1_control_m)
         dp = ClampedCubicProfile(config.device.length_m, solution.d_c2c_control_m)
         points = list(zip(wp(z), dp(z)))
-        wavelengths = np.unique(np.r_[solution.wavelengths_m, (config.device.wavelength_min_m+config.device.wavelength_max_m)/2])
+        wavelengths = ([config.device.wavelength_min_m,config.device.wavelength_max_m] if endpoint_wavelengths_only else
+                       np.unique(np.r_[solution.wavelengths_m, (config.device.wavelength_min_m+config.device.wavelength_max_m)/2]))
     evaluator = evaluator_factory(config)
     run = None
     try:
@@ -847,6 +849,8 @@ def verify_design(config, output, endpoint, solution=None, *, bar=None, evaluato
         report = {'status': ('incomplete' if evaluator.synthetic else 'passed') if passed else 'failed',
                   'synthetic': bool(evaluator.synthetic), 'certificate_id': certificate['certificate_id'],
                   'scope': 'Actual saved design checked in both liquid states against the Block 0 reference.',
+                  'wavelength_policy':'endpoints_only' if endpoint_wavelengths_only else 'saved_grid_plus_midpoint',
+                  'wavelengths_m':[float(v) for v in wavelengths],
                   'checks': run.rows, 'stored_coefficient_checks': scalar_checks}
     except BudgetExceeded as exc:
         report = {'status': 'incomplete', 'reason': str(exc), 'checks': run.rows if run else []}
@@ -870,15 +874,17 @@ def require_design_verification(config, output, endpoint, solution=None, *, back
     coordinates = {'z': solution.z_m, 'wavelengths': solution.wavelengths_m} if solution is not None else None
     criteria = {k:v for k,v in config.as_dict()['convergence'].items() if k not in {'max_solves','max_seconds','timing_repeats'}}
     key = checkpoint_identity(config, 2, {'design': design, 'coordinates': coordinates,
-                                       'verification': criteria, 'verification_code': implementation_identity()})
+                                       'verification': criteria, 'verification_code': implementation_identity(),
+                                       'wavelength_policy':'endpoints_only'})
     directory = (checkpoint_directory(config)/'verification'/key if config.execution.reuse_verification
                  else Path(output)/'block0_checks'/uuid.uuid4().hex[:12])
     report = verify_design(config, directory, endpoint, solution, bar=bar,
                            evaluator_factory=lambda cfg: NativeEvaluator(cfg, backend=backend),
-                           resume=(directory/"checkpoint.json").exists())
+                           resume=(directory/"checkpoint.json").exists(),endpoint_wavelengths_only=True)
     if report['status'] == 'incomplete':
         raise BudgetExceeded(f'Block 0 selected-design verification incomplete; resume evidence in {directory}.')
     if report['status'] != 'passed':
         raise ValueError(f'Block 0 selected-design verification {report["status"]}; see {directory}. Review mode selection and recalibrate before publishing this design.')
     return {'status': 'passed', 'certificate_id': config.solver.calibration['certificate_id'],
-            'report': str(directory/'design_verification.json'), 'checks': len(report['checks'])}
+            'report': str(directory/'design_verification.json'), 'checks': len(report['checks']),
+            'wavelength_policy':'endpoints_only'}

@@ -130,6 +130,8 @@ def _run_workflow(
         if reusable: selected = [reusable]
     first,source_path = selected[0] if selected else (1,None)
     endpoint,solution,bar,artifact = load_block(source_path,first-1,config) if selected else (None,None,None,None)
+    if first==3:
+        blocks.require_endpoint_wavelengths(solution,config)
     output = _output_path(config,str(out_path) if out_path else None)
     output.mkdir(parents=True,exist_ok=True)
     blocks.invalidate(output,first)
@@ -157,7 +159,7 @@ def _run_workflow(
             if backend is not None:
                 backend.budget = budget
                 progress.start_stage('MODE API/license preflight',total=1,unit='startup checks')
-                backend.preflight(.5*(config.device.wavelength_min_m+config.device.wavelength_max_m))
+                backend.preflight(config.device.wavelength_min_m)
                 progress.update(1)
                 progress.finish_stage()
             if first==1:
@@ -425,7 +427,7 @@ def _add_solver_runtime_args(parser: argparse.ArgumentParser) -> None:
         parser.add_argument('--max-seconds', type=float)
     parser.add_argument('--no-resume', action='store_true')
     parser.add_argument('--cache-dir')
-    parser.add_argument('--characterize', action='store_true', help='Retain directly checked broadband cross/bar grids for the frozen profile.')
+    parser.add_argument('--characterize', action='store_true', help='Retain directly checked cross/bar z grids at the endpoint wavelengths.')
     parser.add_argument('--block0-dir', default=None, help='Passed Block 0 directory or certificate.json; validates and applies its solver profiles.')
     parser.add_argument(
         "--api-path",
@@ -551,7 +553,7 @@ def _main(argv: list[str] | None = None) -> int:
         if name == 'cache':
             operation.add_argument('--max-bytes', type=int, help='Explicitly prune least recently used entries to this payload size.')
             operation.add_argument('--vacuum', action='store_true', help='Reclaim unused SQLite disk pages after pruning.')
-    characterize = subparsers.add_parser('characterize', help='Retain directly checked broadband coefficients on frozen Block 2 geometry')
+    characterize = subparsers.add_parser('characterize', help='Retain directly checked endpoint-wavelength coefficients on frozen Block 2 geometry')
     characterize.set_defaults(block_number=3, block_validation=False)
     characterize.add_argument('--config', default=str(DEFAULT_CONFIG))
     characterize.add_argument('--profile-dir', required=True)

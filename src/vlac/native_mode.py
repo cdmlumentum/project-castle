@@ -57,7 +57,7 @@ def _endpoint_packet(endpoint):
 
 def prepare_bundle(config, output, *, endpoint_dir=None, profile_dir=None, width_samples=None):
     config.validate()
-    if config.solver.tracking_method != 'legacy' or config.optimizer.method == 'monotone_powell':
+    if config.solver.tracking_method != 'legacy' or config.optimizer.method != 'bounded_powell':
         raise ValueError('Guarded tracking and monotone Powell require tools/run_vlac.py block2 with the native backend; standalone coordinate_pattern is a different method.')
     g, e, o, d = config.geometry, config.endpoint_search, config.optimizer, config.device
     if g.h_gap_bounds_m[0] != g.h_gap_bounds_m[1] or g.h_rib_bounds_m[0] != g.h_rib_bounds_m[1]:
@@ -138,6 +138,8 @@ def prepare_bundle(config, output, *, endpoint_dir=None, profile_dir=None, width
         (output / f"block{number}.lsf").write_text("\n".join(lines)+"\n", encoding="utf-8")
     if upstream is not None:
         endpoint, solution, _, _ = upstream
+        if solution is not None:
+            blocks.require_endpoint_wavelengths(solution,config)
         ep = _endpoint_packet(endpoint); ep["bundle_id"] = payload["bundle_id"]
         # np.object_ ensures that records round-trip as a Lumerical cell.
         ep["rows"] = np.array(ep["rows"], dtype=object).reshape(-1, 1)
@@ -200,6 +202,7 @@ def export_result(value, block, config, output, *, inspection_project=None):
         [{"success": bool(scalar(profile["optimizer_converged"])), "method": profile["method"],
           "evaluations": int(scalar(profile["evaluations"]))}], [], bool(scalar(profile["grid_checks"]["passed"])),
     )
+    blocks.require_endpoint_wavelengths(solution,config)
     # Imported Python profiles carry their objective/targets explicitly below.
     report = blocks.profile_report(solution, endpoint, config)
     report["native_optimizer_method"] = profile["method"]

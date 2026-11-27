@@ -83,20 +83,28 @@ def profile_report(solution,endpoint,config):
     passed = optimization and solution.grid_converged and quality['passed'] and config.solver.endpoint_domain_policy=='strict'
     constraints = validate_endpoint(endpoint,config)
     edges_only = len(solution.wavelengths_m)==2
+    sequential = config.optimizer.method == 'sequential_width_offset_v1'
     return {'block':2,'status':'passed' if passed else 'review','execution_completed':True,'usable':True,
             'optimization_converged':optimization,'grid_converged':bool(solution.grid_converged),
             'coefficient_quality':quality,'objective_achieved':solution.objective,
             'target_fit_acceptance_threshold':None,
+            'optimizer_method':config.optimizer.method,
+            'sequential_stages':([{'width':h['width_stage'],
+                'offset_objective':h['offset_objective'],'offset_success':h['offset_success'],
+                'width_frozen_during_offset_fit':h['width_frozen_during_offset_fit']}
+                for h in solution.optimizer_history] if sequential else None),
             'exploratory_only':config.solver.endpoint_domain_policy=='warn_exploratory',
             'endpoint_domain_policy':config.solver.endpoint_domain_policy,
-            'scope':('cross-state profile optimization and z coefficient interpolation checks at the band edges'
+            'scope':('sequential isolated-width and coupled-offset fits with z midpoint checks at the band edges' if sequential else
+                     'cross-state profile optimization and z coefficient interpolation checks at the band edges'
                      if edges_only else 'cross-state profile optimization on the saved wavelength grid'),
             'wavelength_validation':('band edges only; interior wavelengths not checked in Block 2'
                                      if edges_only else 'see saved grid history for wavelength checks'),
             'grid_tolerance':config.device.grid_convergence_rtol,'grid_history':solution.grid_convergence_history,
             'fixed_endpoint_widths_m':[endpoint.w1_input_m,endpoint.w1_output_m],
             'endpoint_common_target_checks':constraints['block2_common_target_checks'],
-            'note':'Grid convergence covers z sampling at the saved wavelengths; it does not establish interior-wavelength accuracy, a small target-fit objective or full-device performance.'}
+            'note':('Grid convergence covers z interpolation at the endpoint wavelengths only; it does not establish interior-wavelength accuracy, optical mesh/domain convergence, a small target-fit objective or full-device performance.' if sequential else
+                    'Grid convergence covers z sampling at the saved wavelengths; it does not establish interior-wavelength accuracy, a small target-fit objective or full-device performance.')}
 
 
 def run_profile(backend,config,bank,endpoint,output,*,progress=None,source=None):
@@ -118,10 +126,16 @@ def run_profile(backend,config,bank,endpoint,output,*,progress=None,source=None)
     return solution,artifact
 
 
+def require_endpoint_wavelengths(solution,config):
+    expected = [config.device.wavelength_min_m,config.device.wavelength_max_m]
+    if not np.array_equal(solution.wavelengths_m,expected):
+        raise ValueError('Blocks 2/3 require a profile with exactly the two configured endpoint wavelengths; use a compatible Block 2 result.')
+
+
 def check_bar_grid(backend,config,bank,endpoint,solution,bar,*,progress=None):
+    require_endpoint_wavelengths(solution,config)
     errors = {}
-    for name,axis,current,limit in (('z',1,solution.z_m,config.device.z_samples_max),
-                                    ('wavelength',0,solution.wavelengths_m,config.device.wavelength_samples_max)):
+    for name,axis,current,limit in (('z',1,solution.z_m,config.device.z_samples_max),):
         refined = _grid_refine(current)
         if len(refined)>limit:
             errors[name] = None
@@ -137,20 +151,23 @@ def check_bar_grid(backend,config,bank,endpoint,solution,bar,*,progress=None):
         if not quality['passed']: errors[name] = max(errors[name],1.)
         if progress: progress.finish_stage(f'normalized interpolation error={errors[name]:.6g}')
     return {'passed':all(v is not None and v<=config.device.grid_convergence_rtol for v in errors.values()),
-            'z_coefficient_interpolation_error':errors['z'],'wavelength_coefficient_interpolation_error':errors['wavelength'],
+            'z_coefficient_interpolation_error':errors['z'],'wavelength_coefficient_interpolation_error':None,
+            'wavelength_check':'band_edges_only_no_interior_check',
             'tolerance':config.device.grid_convergence_rtol,
-            'scope':'fixed saved geometry; no profile optimization or endpoint search',
+            'scope':'fixed saved geometry; z interpolation at endpoint wavelengths only; no profile optimization or endpoint search',
             'note':'A failed or unavailable check needs a denser coefficient grid; targets are not imposed on the bar state.'}
 
 
 def run_bar(backend,config,bank,endpoint,solution,output,*,progress=None,source=None):
+    require_endpoint_wavelengths(solution,config)
     bar = evaluate_design_profiles(backend,config,bank,endpoint,solution.w1_control_m,solution.d_c2c_control_m,
                                   solution.z_m,solution.wavelengths_m,state='bar',progress=progress)
     quality = validate_grid(bar,solution,config)
     characterization = None
     if config.characterization.enabled:
         from .characterize import characterize_profile
-        characterization = characterize_profile(backend, config, bank, endpoint, solution, progress=progress)
+        characterization = characterize_profile(backend, config, bank, endpoint, solution, progress=progress,
+                                               endpoint_wavelengths_only=True)
         checked = dict(characterization['validation'], passed=characterization['validation']['status']=='passed')
     else:
         checked = check_bar_grid(backend,config,bank,endpoint,solution,bar,progress=progress)
@@ -160,6 +177,7 @@ def run_bar(backend,config,bank,endpoint,solution,output,*,progress=None,source=
               'execution_completed':True,'usable':True,'coefficient_quality':quality,'grid_validation':checked,
               'upstream_validation':(source or {}).get('validation',{}),
               'profile_optimized_this_block':False,'scope':'bar-state coefficients for the saved Block 2 geometry'}
+    report['wavelength_validation'] = 'endpoint wavelengths only; no interior-wavelength accuracy claim'
     if calibration_check is not None:
         report['block0_verification'] = calibration_check
     export_profiles(output,config,endpoint,solution,bar)
@@ -233,6 +251,8 @@ def _run_single_block(block,config,output,source_dir,*,backend_factory,progress,
     out.mkdir(parents=True,exist_ok=True)
     invalidate(out,block)
     endpoint,solution,bar,source = load_block(source_dir,block-1,config)
+    if block==3:
+        require_endpoint_wavelengths(solution,config)
     write_json(out/'configuration.json',config.as_dict())
     bank = build_material_bank(config)
     characterization = source.get('payload',{}).get('characterization')
@@ -247,7 +267,7 @@ def _run_single_block(block,config,output,source_dir,*,backend_factory,progress,
     else:
         progress.start_stage('MODE API/license preflight',total=1,unit='startup checks')
         with backend_factory(config,cache_path=resolved_cache(config),progress=progress) as backend:
-            backend.preflight(.5*(config.device.wavelength_min_m+config.device.wavelength_max_m))
+            backend.preflight(config.device.wavelength_min_m)
             progress.update(1)
             progress.finish_stage()
             source['backend_name'] = backend.backend_name
@@ -269,7 +289,9 @@ def _run_single_block(block,config,output,source_dir,*,backend_factory,progress,
 
 def run_single_block(block, config, output, source_dir, *, backend_factory, progress, validation_only=False):
     # Validate before touching published artifacts or acquiring a license.
-    load_block(source_dir, block-1, config)
+    upstream = load_block(source_dir, block-1, config)
+    if block==3:
+        require_endpoint_wavelengths(upstream[1],config)
     from .progress import ProgressReporter
     with output_attempt(output, progress.command) as attempt:
         attempt_progress = ProgressReporter(progress.command, attempt, context={'block': block})

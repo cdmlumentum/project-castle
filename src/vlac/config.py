@@ -308,8 +308,15 @@ class WorkflowConfig:
             raise ValueError("The common field-overlap grid is too small.")
         if o.control_points < 4:
             raise ValueError("Use at least four spline control points per profile.")
-        if o.method not in {'bounded_powell','monotone_powell'}:
-            raise ValueError('optimizer.method must be bounded_powell or monotone_powell.')
+        if o.method not in {'bounded_powell','monotone_powell','sequential_width_offset_v1'}:
+            raise ValueError('optimizer.method must be bounded_powell, monotone_powell or sequential_width_offset_v1.')
+        if o.method == 'sequential_width_offset_v1':
+            if s.tracking_method != 'guarded_translation_v1' or s.engine != 'native':
+                raise ValueError('sequential_width_offset_v1 requires guarded native mode tracking.')
+            if o.max_function_evaluations_per_grid < 2:
+                raise ValueError('Sequential fitting needs at least two evaluations per grid, one for each stage.')
+            if not g.d_c2c_bounds_m[0] <= 0 <= g.d_c2c_bounds_m[1]:
+                raise ValueError('Sequential isolated width fitting requires x=0 inside the offset bounds.')
         if s.tracking_method not in {'legacy','guarded_translation_v1'}:
             raise ValueError('Unknown tracking method.')
         if s.tracking_method != 'legacy' and s.engine != 'native':
@@ -317,11 +324,11 @@ class WorkflowConfig:
         if s.endpoint_domain_policy not in {'strict','warn_exploratory'}:
             raise ValueError('Unknown endpoint_domain_policy.')
         if s.endpoint_domain_policy == 'warn_exploratory':
-            if (s.tracking_method != 'guarded_translation_v1' or o.method != 'monotone_powell'
+            if (s.tracking_method != 'guarded_translation_v1' or o.method not in {'monotone_powell','sequential_width_offset_v1'}
                     or o.max_function_evaluations_per_grid>6 or o.max_grid_refinements!=0
                     or self.execution.max_seconds is None or self.execution.max_seconds>2700
                     or self.execution.max_solves is None or self.execution.max_solves>120):
-                raise ValueError('warn_exploratory requires guarded monotone Powell, <=6 evaluations, no optimization refinements, <=120 solves and <=2700 seconds.')
+                raise ValueError('warn_exploratory requires guarded monotone/sequential Powell, <=6 total evaluations, no optimization refinements, <=120 solves and <=2700 seconds.')
         if isinstance(s.tracking_recovery_depth,bool) or not isinstance(s.tracking_recovery_depth,int) or not 0<=s.tracking_recovery_depth<=5:
             raise ValueError('tracking_recovery_depth must be an integer from 0 to 5.')
         if e.method not in {"adaptive_1d", "python_grid", "python_pso"}:

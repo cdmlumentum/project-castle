@@ -20,6 +20,13 @@ The initial local comparison took approximately 75 versus 94 seconds for the Pyt
 
 ## Run this checkout
 
+For separate width-to-detuning and offset-to-coupling fits, select
+`config/native_sequential.json` with the Python `block2` command. The named
+`sequential_width_offset_v1` alternative retains the native FDE backend and
+guarded tracking; see [v0.26.4](../changes/v26_4.md) for stage budgets, endpoint-wavelength-only validation and the remaining
+coefficient-extraction blocker.
+The standalone native bundle does not implement this method.
+
 Block 2 exports `block2_geometry.json` (fixed dimensions and exact cubic spline
 controls), a dense geometry CSV, and `block2_target_comparison.{json,csv,png,pdf}`.
 The comparison uses Δβ = βupper − βlower, targets −D cos(θ) and (D/2) sin(θ),
@@ -70,7 +77,7 @@ Block 1 uses `adaptive_max_widths` evenly spaced widths unless `--width-samples`
 
 Block 1 retains those ten selected modes and their SI tracking-grid coordinates in `block1_native.mat`. Before saving `block1.lms`, its entry script performs one additional full-domain solve with both guides enabled at the selected input width/offset, cross liquid state and minimum wavelength. All entry scripts first save an incomplete MAT and empty LMS using safe-mode-compatible commands; a successful result replaces them. Published Python outputs are retained in immutable attempts, so a failed rerun does not replace a prior success. MODE `native run` and `native import` publish the two-panel endpoint beta plot (PNG/PDF), field NPZ/PNG, `endpoint_diagnostics.json`, and a copy of that LMS under `python/block1`. Running the LSF directly produces the MAT/LMS files; import generates the Python plots. These outputs are inspection evidence, separate from the scalar versioned handoff.
 
-Block 2 holds endpoint widths and offsets fixed, evaluates the clamped cubic profiles at the two band edges, fits the cross-state Blackman targets with the minimax objective, and checks coefficient interpolation at independent z midpoints. Its optimizer is named `coordinate_pattern`. This follows the current project's band-edge-only Block 2 policy. Block 3 reuses that exact profile and common grid in the bar state, with independent z and wavelength midpoint checks, no profile optimization and no bar target fit.
+Block 2 holds endpoint widths and offsets fixed, evaluates the clamped cubic profiles at the two band edges, fits the cross-state Blackman targets with the minimax objective, and checks coefficient interpolation at independent z midpoints. Its optimizer is named `coordinate_pattern`. This follows the current project's band-edge-only Block 2 policy. Block 3 reuses that exact profile and common grid in the bar state, with independent z midpoint checks at those endpoint wavelengths only, no profile optimization and no bar target fit.
 
 The standalone optimizer currently supports the default unconstrained slope and curvature settings. Preparation rejects explicit slope or curvature limits; use the native package path with the existing Powell optimizer for those limits. Standalone endpoint search requires fixed gap and rib height and the existing state-independent lower-guide assumption. Missing modes, rejected mode eligibility, API failures and failed handoffs remain distinct outcomes.
 

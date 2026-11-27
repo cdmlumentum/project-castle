@@ -310,12 +310,13 @@ class BlockHandoffTests(unittest.TestCase):
         self.profile()
         class Rapid(RecordingBackend):
             def evaluate_coefficients(self,g,wavelength,**kwargs):
-                delta = 1000.+20000*np.cos(2*np.pi*(wavelength-self.config.device.wavelength_min_m)/(self.config.device.wavelength_max_m-self.config.device.wavelength_min_m))
+                delta = 1000.+2e6*np.cos(2*np.pi*(g.d_c2c_m-self.config.geometry.d_c2c_input_m)/(self.config.geometry.d_c2c_output_m-self.config.geometry.d_c2c_input_m))
                 q=np.sqrt((delta/2)**2+100.**2)
                 return extract_coupling(1e7+delta/2,1e7-delta/2,1e7+q,1e7-q),None
         self.assertEqual(self.command('validate-block3','--profile-dir',self.b2,'--out',self.b3,backend=Rapid),3)
         report = json.loads((self.b3/'block3_validation_report.json').read_text())
-        self.assertGreater(report['grid_validation']['wavelength_coefficient_interpolation_error'],self.config.device.grid_convergence_rtol)
+        self.assertGreater(report['grid_validation']['z_coefficient_interpolation_error'],self.config.device.grid_convergence_rtol)
+        self.assertIsNone(report['grid_validation']['wavelength_coefficient_interpolation_error'])
         self.assertTrue((self.b3/'block3_result.json').exists())
 
     def test_block4_reports_step_limit_without_mode_and_preserves_review_export(self):
