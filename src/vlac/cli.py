@@ -450,6 +450,7 @@ def _main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="vlac")
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser('check-lower-state', help='isolated sub-hour MODE test of state-independent lower-mode reuse')
+    subparsers.add_parser('check-midpoint', help='aligned midpoint width feasibility and sentinel checks')
     run = subparsers.add_parser("run", help="run endpoint search, optimize, propagate, export")
     run.add_argument("--config", default=str(DEFAULT_CONFIG))
     run.add_argument("--out", default=None)
@@ -916,6 +917,9 @@ def _main(argv: list[str] | None = None) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments and arguments[0] == 'check-midpoint':
+        from .midpoint_feasibility import main as check_midpoint
+        return check_midpoint(arguments[1:])
     if arguments and arguments[0] == 'check-lower-state':
         from .lower_state_check import main as check_lower_state
         return check_lower_state(arguments[1:])
